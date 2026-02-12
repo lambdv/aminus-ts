@@ -26,10 +26,11 @@ describe("Graph primitives", () => {
 
   it("DependedBuffedStatNode should compute buffs based on another node", () => {
     const self = new StatTable(["FlatATK", 100]);
-    const other = new StatTable(["FlatATK", 50]);
+
+    const other = new StatTable(["BaseATK", 500]);
     const mapper = new Map<StatType, (s: StatTable) => number>();
     // add a constant FlatATK buff of 10 based on other
-    mapper.set("FlatATK", (s: StatTable) => s.get("FlatATK") * 0 + 10);
+    mapper.set("FlatATK", (s: StatTable) => s.get("BaseATK") * 1.6);
 
     const dbn = new DependedBuffedStatNode(
       new StatNode(self),
@@ -38,7 +39,7 @@ describe("Graph primitives", () => {
     );
 
     const result = dbn.eval();
-    expect(result.get("FlatATK")).toBe(110);
+    expect(result.get("FlatATK")).toBe(900);
   });
 
   it("OpNode should evaluate the provided damage compute against its StatNode", () => {

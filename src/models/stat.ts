@@ -1,45 +1,48 @@
-type StatType =
-  | "BaseHP"
-  | "FlatHP"
-  | "HPPercent"
-  | "BaseATK"
-  | "FlatATK"
-  | "ATKPercent"
-  | "BaseDEF"
-  | "FlatDEF"
-  | "DEFPercent"
-  | "ElementalMastery"
-  | "CritRate"
-  | "CritDMG"
-  | "EnergyRecharge"
-  | "DMGBonus"
-  | "ElementalDMGBonus"
-  | "PyroDMGBonus"
-  | "CryoDMGBonus"
-  | "GeoDMGBonus"
-  | "DendroDMGBonus"
-  | "ElectroDMGBonus"
-  | "HydroDMGBonus"
-  | "AnemoDMGBonus"
-  | "PhysicalDMGBonus"
-  | "NormalATKDMGBonus"
-  | "ChargeATKDMGBonus"
-  | "PlungeATKDMGBonus"
-  | "SkillDMGBonus"
-  | "BurstDMGBonus"
-  | "HealingBonus"
-  | "None"
-  | "ReactionBonus"
-  | "DefReduction"
-  | "DefIgnore"
-  | "PyroResistanceReduction"
-  | "HydroResistanceReduction"
-  | "ElectroResistanceReduction"
-  | "CryoResistanceReduction"
-  | "AnemoResistanceReduction"
-  | "GeoResistanceReduction"
-  | "DendroResistanceReduction"
-  | "PhysicalResistanceReduction";
+export const STAT_TYPES = [
+  "BaseHP",
+  "FlatHP",
+  "HPPercent",
+  "BaseATK",
+  "FlatATK",
+  "ATKPercent",
+  "BaseDEF",
+  "FlatDEF",
+  "DEFPercent",
+  "ElementalMastery",
+  "CritRate",
+  "CritDMG",
+  "EnergyRecharge",
+  "DMGBonus",
+  "ElementalDMGBonus",
+  "PyroDMGBonus",
+  "CryoDMGBonus",
+  "GeoDMGBonus",
+  "DendroDMGBonus",
+  "ElectroDMGBonus",
+  "HydroDMGBonus",
+  "AnemoDMGBonus",
+  "PhysicalDMGBonus",
+  "NormalATKDMGBonus",
+  "ChargeATKDMGBonus",
+  "PlungeATKDMGBonus",
+  "SkillDMGBonus",
+  "BurstDMGBonus",
+  "HealingBonus",
+  "None",
+  "ReactionBonus",
+  "DefReduction",
+  "DefIgnore",
+  "PyroResistanceReduction",
+  "HydroResistanceReduction",
+  "ElectroResistanceReduction",
+  "CryoResistanceReduction",
+  "AnemoResistanceReduction",
+  "GeoResistanceReduction",
+  "DendroResistanceReduction",
+  "PhysicalResistanceReduction",
+] as const;
+
+type StatType = (typeof STAT_TYPES)[number];
 
 type StatValue = [StatType, number];
 
@@ -186,6 +189,13 @@ class StatTable extends Map<StatType, number> {
   }
   clone() {
     return new StatTable(...this);
+  }
+  merge(other: StatTable): StatTable {
+    let sum = new StatTable();
+    STAT_TYPES.map((s) => {
+      sum.set(s, this.get(s) + other.get(s));
+    });
+    return sum;
   }
 }
 
