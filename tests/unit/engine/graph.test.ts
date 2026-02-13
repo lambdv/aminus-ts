@@ -1,11 +1,11 @@
-import { StatTable, StatType } from "../../../src/models/stat";
+import { StatTable, StatType } from "@/core/stat";
 import {
   StatNode,
   BuffedStatNode,
   DependedBuffedStatNode,
   OpNode,
   Graph,
-} from "../../../src/engine/graph";
+} from "@/engine/graph";
 
 describe("Graph primitives", () => {
   it("StatNode should return the underlying StatTable", () => {

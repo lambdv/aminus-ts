@@ -1,6 +1,6 @@
-import { StatTable } from "../../../src/models/stat";
-import { dmg_formula } from "../../../src/models/formulas";
-import { StatNode, OpNode, Graph } from "../../../src/engine/graph";
+import { StatTable } from "@/core/stat";
+import { dmg_formula } from "@/core/formulas";
+import { StatNode, OpNode, Graph } from "@/engine/graph";
 
 describe("Graph integration (dmg_formula)", () => {
   it("computes damage for a single StatNode using dmg_formula", () => {

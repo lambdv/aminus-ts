@@ -2,8 +2,9 @@
   "name": "dps2",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
+    "build": "tsc",
     "test": "jest"
   },
   "author": "",

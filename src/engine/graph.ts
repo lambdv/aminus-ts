@@ -14,8 +14,8 @@ import {
   Rotation,
   compose,
   DamageCompute,
-} from "../models/stat";
-import { dmg_formula } from "../models/formulas";
+} from "../core/stat.js";
+import { dmg_formula } from "../core/formulas.js";
 
 interface Node {
   eval(): StatTable;

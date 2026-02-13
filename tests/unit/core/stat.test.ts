@@ -1,10 +1,5 @@
-import {
-  StatType,
-  StatTable,
-  Rotation,
-  compose,
-} from "../../../src/models/stat";
-import { dmg_formula } from "../../../src/models/formulas";
+import { StatType, StatTable, Rotation, compose } from "@/core/stat";
+import { dmg_formula } from "@/core/formulas";
 
 describe("StatTable", () => {
   it("should create a new StatTable", () => {
@@ -31,7 +26,29 @@ describe("StatTable", () => {
   });
 });
 
+describe("StatTable Basic Operations", () => {
+  it("should start at 0 and accumulate values", () => {
+    const table = new StatTable();
+    expect(table.get("FlatATK")).toBe(0); // starts at 0
+    table.add("FlatATK", 10.0);
+    expect(table.get("FlatATK")).toBe(10.0);
+    table.add("FlatATK", 10.0);
+    expect(table.get("FlatATK")).toBe(20.0); // accumulates
+  });
+});
+
 describe("Rotation", () => {
+  it("should return sum of action results", () => {
+    const rotation = new Rotation([
+      ["test", (stats: StatTable) => stats.get("FlatATK")],
+      ["test2", (stats: StatTable) => stats.get("FlatATK")],
+    ]);
+
+    const stats = new StatTable(["FlatATK", 1.6]);
+    const result = rotation.execute(stats);
+
+    expect(result).toBe(1.6 * 2.0);
+  });
   it("should execute a rotation and compute total damage", () => {
     const x = default_stat_table_factory();
     const r = new Rotation([
