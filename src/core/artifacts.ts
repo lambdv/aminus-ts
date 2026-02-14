@@ -13,20 +13,24 @@ type Artifact = {
   substats?: StatTable;
 };
 
-type ArtifactPiece = {
-  rarity: number;
-  level: number;
-  stat_type: StatType;
-};
+type ArtifactRollQuality = "MAX" | "HIGH" | "MID" | "LOW" | "AVG";
 
 enum RollQuality {
   MAX,
   HIGH,
   MID,
   LOW,
-  AVG,
+  AVG, // Average of MAX, HIGH, MID, LOW
 }
 
+type ArtifactPiece = {
+  rarity: number;
+  level: number;
+  stat_type: StatType;
+};
+
+
+/** returns multiplier for a given roll quality */
 function rollQualityMultiplier(quality: RollQuality): number {
   switch (quality) {
     case RollQuality.MAX:
@@ -44,33 +48,47 @@ function rollQualityMultiplier(quality: RollQuality): number {
   }
 }
 
+/** returns max number of rolls for a given artifact piece */
 function maxRollsFor(
   artifact: ArtifactPiece,
-  worseCase: boolean = false,
 ): number {
   const baseSubstats = artifact.rarity - 1;
   const upgrades = Math.floor(artifact.level / 4);
   return baseSubstats + upgrades;
 }
 
+/** returns max number of rolls for a given artifact piece and substat type */
 function maxRollsForGiven(
   artifact: ArtifactPiece,
   substatType: StatType,
   worseCase: boolean = false,
 ): number {
-  if (artifact.stat_type === substatType) {
-    return 0;
-  }
+  if (artifact.stat_type === substatType) return 0;
   const upgrades = Math.floor(artifact.level / 4);
-  if (worseCase) {
-    return upgrades;
-  } else {
-    return upgrades + 1;
-  }
+  return worseCase ? upgrades : upgrades + 1;
 }
 
 function isValidSubstatType(statType: StatType): boolean {
   return POSSIBLE_SUB_STATS.includes(statType);
+}
+
+const validate_artifact_pieces = (  
+  flower?: ArtifactPiece,
+  feather?: ArtifactPiece,
+  sands?: ArtifactPiece,
+  goblet?: ArtifactPiece,
+  circlet?: ArtifactPiece,
+) => {
+  if (flower && flower.stat_type !== "FlatHP")
+    throw new Error("Flower must have FlatHP main stat");
+  if (feather && feather.stat_type !== "FlatATK")
+    throw new Error("Feather must have FlatATK main stat");
+  if (sands && !POSSIBLE_SANDS_STATS.includes(sands.stat_type))
+    throw new Error("Invalid sands main stat");
+  if (goblet && !POSSIBLE_GOBLET_STATS.includes(goblet.stat_type))
+    throw new Error("Invalid goblet main stat");
+  if (circlet && !POSSIBLE_CIRCLE_STATS.includes(circlet.stat_type))
+    throw new Error("Invalid circlet main stat");
 }
 
 export class ArtifactBuilder {
@@ -82,7 +100,7 @@ export class ArtifactBuilder {
   rolls: Map<[StatType, RollQuality, number], number> = new Map();
   constraints: Map<[StatType, number], number> = new Map();
   rollLimit?: number;
-
+  //general constructor to building any set of artifacts
   constructor(
     flower?: ArtifactPiece,
     feather?: ArtifactPiece,
@@ -90,24 +108,16 @@ export class ArtifactBuilder {
     goblet?: ArtifactPiece,
     circlet?: ArtifactPiece,
   ) {
-    if (flower && flower.stat_type !== "FlatHP")
-      throw new Error("Flower must have FlatHP main stat");
-    if (feather && feather.stat_type !== "FlatATK")
-      throw new Error("Feather must have FlatATK main stat");
-    if (sands && !POSSIBLE_SANDS_STATS.includes(sands.stat_type))
-      throw new Error("Invalid sands main stat");
-    if (goblet && !POSSIBLE_GOBLET_STATS.includes(goblet.stat_type))
-      throw new Error("Invalid goblet main stat");
-    if (circlet && !POSSIBLE_CIRCLE_STATS.includes(circlet.stat_type))
-      throw new Error("Invalid circlet main stat");
-
+    validate_artifact_pieces(flower, feather, sands, goblet, circlet);
     this.flower = flower;
     this.feather = feather;
     this.sands = sands;
     this.goblet = goblet;
     this.circlet = circlet;
+    this.initConstraints();
+  }
 
-    // Initialize constraints
+  private initConstraints() {
     for (const stat of POSSIBLE_SUB_STATS) {
       const pieces = [
         this.flower,
@@ -122,13 +132,12 @@ export class ArtifactBuilder {
           const current = this.constraints.get(key) || 0;
           this.constraints.set(
             key,
-            current + maxRollsForGiven(piece, stat, false),
+            current + maxRollsForGiven(piece, stat),
           );
         }
       }
     }
   }
-
   static kqmc(
     flower?: ArtifactPiece,
     feather?: ArtifactPiece,
@@ -136,20 +145,11 @@ export class ArtifactBuilder {
     goblet?: ArtifactPiece,
     circlet?: ArtifactPiece,
   ): ArtifactBuilder {
-    if (flower && flower.stat_type !== "FlatHP")
-      throw new Error("Flower must have FlatHP main stat");
-    if (feather && feather.stat_type !== "FlatATK")
-      throw new Error("Feather must have FlatATK main stat");
-    if (sands && !POSSIBLE_SANDS_STATS.includes(sands.stat_type))
-      throw new Error("Invalid sands main stat");
-    if (goblet && !POSSIBLE_GOBLET_STATS.includes(goblet.stat_type))
-      throw new Error("Invalid goblet main stat");
-    if (circlet && !POSSIBLE_CIRCLE_STATS.includes(circlet.stat_type))
-      throw new Error("Invalid circlet main stat");
-
+    validate_artifact_pieces(flower, feather, sands, goblet, circlet);
     const pieces = [flower, feather, sands, goblet, circlet].filter(
       (p) => p !== undefined,
     ) as ArtifactPiece[];
+
     //validate
     for (const piece of pieces) {
       if (piece.rarity <= 3) {
@@ -187,7 +187,7 @@ export class ArtifactBuilder {
       }
     }
 
-    const base = pieces.reduce((sum, p) => sum + maxRollsFor(p, false), 0);
+    const base = pieces.reduce((sum, p) => sum + maxRollsFor(p), 0);
     const penalty = pieces.length;
     builder.rollLimit = base - penalty;
 
@@ -391,7 +391,7 @@ export class ArtifactBuilder {
       this.goblet,
       this.circlet,
     ].filter((p) => p !== undefined) as ArtifactPiece[];
-    return pieces.reduce((sum, p) => sum + maxRollsFor(p, false), 0);
+    return pieces.reduce((sum, p) => sum + maxRollsFor(p), 0);
   }
 
   substatConstraint(statType: StatType, rarity: number): number {
