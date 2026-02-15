@@ -19,17 +19,14 @@ describe("Damage Calculation Integration", () => {
     );
 
     const rotation = new Rotation(
-      ["n1", dmg_formula("Cryo", "Normal", 0.84, new StatTable(), 3)],
-      ["n2", dmg_formula("Cryo", "Normal", 0.894, new StatTable(), 2)],
-      ["ca", dmg_formula("Cryo", "Charged", 3.039, new StatTable(), 2)],
-      ["skill", dmg_formula("Cryo", "Skill", 4.07, new StatTable(), 2)],
-      ["burstcuts", dmg_formula("Cryo", "Burst", 1.91, new StatTable(), 19)],
-      ["burstexplosion", dmg_formula("Cryo", "Burst", 2.86, new StatTable(), 1)],
+      ["n1", dmg_formula("Cryo", "Normal", 0.84, 3)],
+      ["n2", dmg_formula("Cryo", "Normal", 0.894, 2)],
+      ["ca", dmg_formula("Cryo", "Charged", 3.039, 2)],
+      ["skill", dmg_formula("Cryo", "Skill", 4.07, 2)],
+      ["burstcuts", dmg_formula("Cryo", "Burst", 1.91, 19)],
+      ["burstexplosion", dmg_formula("Cryo", "Burst", 2.86)],
     );
-    let energyRechargeRequirement = 1.3;
-
-    ayaka = ayaka.merge(optimalKqmc5ArtifactsStats(ayaka, rotation, energyRechargeRequirement));
-
+    ayaka = ayaka.merge(optimalKqmc5ArtifactsStats(ayaka, rotation, 1.30));
     const dps = rotation.execute(ayaka) / 21.0;
 
     expect(dps).toBeGreaterThan(0);

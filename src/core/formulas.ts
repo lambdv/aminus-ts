@@ -286,8 +286,8 @@ const dmg_formula =
     element: Element,
     damage_type: DamageType,
     motion_value: number,
-    buffs: StatTable = new StatTable(),
     instances = 1,
+    buffs: StatTable = new StatTable(),
     scaling: BaseScaling = "ATK",
     amplifier: Amplifier = "None",
   ) =>
