@@ -5,6 +5,7 @@ import {
   POSSIBLE_CIRCLE_STATS,
   POSSIBLE_SUB_STATS,
   Artifact,
+  getMainStatValue,
 } from "./artifact-constants";
 import { ArtifactBuilder } from "./artifact-builder";
 
@@ -14,9 +15,8 @@ type SubstatDistribution = Map<StatType, number>;
 export function optimalMainStats(
   stats: StatTable,
   rotation: Rotation,
-  getMainStatValue: (stat: StatType) => number,
 ): [StatType, StatType, StatType] {
-  return globalKqmcArtifactMainStatOptimizer(stats, rotation, getMainStatValue);
+  return globalKqmcArtifactMainStatOptimizer(stats, rotation);
 }
 
 export function gradient5StarKqmcArtifactSubstatOptimizer(
@@ -96,10 +96,9 @@ export function optimalKqmc5ArtifactsStats(
   stats: StatTable,
   target: Rotation,
   energyRechargeRequirement: number,
-  getMainStatValue: (stat: StatType) => number,
 ): StatTable {
   const [sandsMain, gobletMain, circletMain] =
-    globalKqmcArtifactMainStatOptimizer(stats, target, getMainStatValue);
+    globalKqmcArtifactMainStatOptimizer(stats, target);
 
   const flower: Artifact = {
     type: "flower",
@@ -194,7 +193,6 @@ function reluHeuristic(
 function globalKqmcArtifactMainStatOptimizer(
   stats: StatTable,
   target: Rotation,
-  getMainStatValue: (stat: StatType) => number,
 ): [StatType, StatType, StatType] {
   const sandsStats = new Set(POSSIBLE_SANDS_STATS);
   const gobletStats = new Set(POSSIBLE_GOBLET_STATS);

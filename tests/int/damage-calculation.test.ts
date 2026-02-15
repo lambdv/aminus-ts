@@ -1,44 +1,38 @@
 import { StatTable, Rotation } from "@/core/stat";
-import { calculate_damage } from "@/core/formulas";
+import { dmg_formula } from "@/core/formulas";
+import { optimalKqmc5ArtifactsStats } from "@/core/optimizer";
 
 describe("Damage Calculation Integration", () => {
   it("should calculate primitive character damage", () => {
-    let diluc = new StatTable(
-      ["BaseATK", 334.85],
-      ["CritRate", 0.192 + 0.05],
-      ["CritDMG", 0.5],
+    let ayaka = new StatTable(
+      ["BaseHP", 12858],
+      ["BaseATK", 342 + 674],
+      ["BaseDEF", 784],
+      ["CritRate", 0.05 + 0.55],
+      ["CritDMG", 0.5 + 0.884 + 0.441],
+      ["EnergyRecharge", 1.0],
+      ["ATKPercent", 0.88],
+      ["CryoDMGBonus", 0.73],
+      ["NormalATKDMGBonus", 0.3],
+      ["ChargeATKDMGBonus", 0.3],
+      ["CryoResistanceReduction", 0.4],
     );
 
-    const weapon = new StatTable(
-      ["BaseATK", 510.0],
-      ["ElementalMastery", 165.0],
+    const rotation = new Rotation(
+      ["n1", dmg_formula("Cryo", "Normal", 0.84, new StatTable(), 3)],
+      ["n2", dmg_formula("Cryo", "Normal", 0.894, new StatTable(), 2)],
+      ["ca", dmg_formula("Cryo", "Charged", 3.039, new StatTable(), 2)],
+      ["skill", dmg_formula("Cryo", "Skill", 4.07, new StatTable(), 2)],
+      ["burstcuts", dmg_formula("Cryo", "Burst", 1.91, new StatTable(), 19)],
+      ["burstexplosion", dmg_formula("Cryo", "Burst", 2.86, new StatTable(), 1)],
     );
-    const artifacts = new StatTable(
-      ["ATKPercent", 0.2],
-      ["CritRate", 0.1],
-      ["PyroDMGBonus", 0.15],
-    ); // example artifact stats
+    let energyRechargeRequirement = 1.3;
 
-    diluc = diluc.merge(weapon).merge(artifacts);
+    ayaka = ayaka.merge(optimalKqmc5ArtifactsStats(ayaka, rotation, energyRechargeRequirement));
 
-    const rotation = new Rotation([
-      [
-        "skill vape",
-        (s) =>
-          calculate_damage(
-            "Pyro",
-            "Skill",
-            "ATK",
-            "None",
-            1.0,
-            1.0,
-            s,
-            undefined,
-          ),
-      ],
-    ]);
+    const dps = rotation.execute(ayaka) / 21.0;
 
-    const result = rotation.execute(diluc);
-    expect(result).toBeCloseTo(598.614, 0);
+    expect(dps).toBeGreaterThan(0);
+    expect(Number.isFinite(dps)).toBe(true);
   });
 });

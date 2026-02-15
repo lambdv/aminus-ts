@@ -207,13 +207,24 @@ const compose = (...funcs: DamageCompute[]): DamageCompute => {
 
 class Rotation {
   actions: [string, DamageCompute][] = [];
-  constructor(actions: [string, DamageCompute][] | DamageCompute[]) {
-    if (actions.length > 0 && typeof actions[0] === "function") {
-      for (let compute of actions as DamageCompute[]) {
+  constructor(actions: ([string, DamageCompute] | DamageCompute)[]);
+  constructor(...actions: ([string, DamageCompute] | DamageCompute)[]);
+  constructor(
+    ...args: [([string, DamageCompute] | DamageCompute)[]] | ([string, DamageCompute] | DamageCompute)[]
+  ) {
+    // Support both `new Rotation([...])` and `new Rotation(a, b, c)`.
+    const first = args[0] as unknown;
+    const isSingleArrayArg = args.length === 1 && Array.isArray(first);
+    const normalized = isSingleArrayArg
+      ? (first as ([string, DamageCompute] | DamageCompute)[])
+      : (args as ([string, DamageCompute] | DamageCompute)[]);
+
+    if (normalized.length > 0 && typeof normalized[0] === "function") {
+      for (let compute of normalized as DamageCompute[]) {
         this.actions.push(["", compute]);
       }
     } else {
-      this.actions = actions as [string, DamageCompute][];
+      this.actions = normalized as [string, DamageCompute][];
     }
   }
   add(action: [string, DamageCompute]) {

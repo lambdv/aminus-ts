@@ -35,11 +35,7 @@ describe("Optimizer", () => {
     const target = atkRotation();
 
     const before = target.execute(stats);
-    const [sands, goblet, circlet] = optimalMainStats(
-      stats,
-      target,
-      getMainStatValue,
-    );
+    const [sands, goblet, circlet] = optimalMainStats(stats, target);
 
     const afterStats = stats.clone();
     afterStats.add(sands, getMainStatValue(sands));
@@ -193,12 +189,7 @@ describe("Optimizer", () => {
     const target = atkRotation();
 
     const before = target.execute(stats);
-    const afterStats = optimalKqmc5ArtifactsStats(
-      stats,
-      target,
-      1.0,
-      getMainStatValue,
-    );
+    const afterStats = optimalKqmc5ArtifactsStats(stats, target, 1.0);
     const after = target.execute(afterStats);
 
     expect(after).toBeGreaterThan(before);
