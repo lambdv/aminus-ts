@@ -1,38 +1,157 @@
 import { StatType, StatTable, Rotation } from "./stat";
+import {
+  POSSIBLE_SANDS_STATS,
+  POSSIBLE_GOBLET_STATS,
+  POSSIBLE_CIRCLE_STATS,
+  POSSIBLE_SUB_STATS,
+  Artifact,
+} from "./artifact-constants";
+import { ArtifactBuilder } from "./artifact-builder";
 
-// Constants for possible main stats
-const POSSIBLE_SANDS_STATS: StatType[] = [
-  "HPPercent",
-  "ATKPercent",
-  "DEFPercent",
-  "ElementalMastery",
-  "EnergyRecharge",
-];
+/** Public API */
+type SubstatDistribution = Map<StatType, number>;
 
-const POSSIBLE_GOBLET_STATS: StatType[] = [
-  "HPPercent",
-  "ATKPercent",
-  "DEFPercent",
-  "ElementalMastery",
-  "PyroDMGBonus",
-  "CryoDMGBonus",
-  "GeoDMGBonus",
-  "DendroDMGBonus",
-  "ElectroDMGBonus",
-  "HydroDMGBonus",
-  "AnemoDMGBonus",
-  "PhysicalDMGBonus",
-];
+export function optimalMainStats(
+  stats: StatTable,
+  rotation: Rotation,
+  getMainStatValue: (stat: StatType) => number,
+): [StatType, StatType, StatType] {
+  return globalKqmcArtifactMainStatOptimizer(stats, rotation, getMainStatValue);
+}
 
-const POSSIBLE_CIRCLE_STATS: StatType[] = [
-  "HPPercent",
-  "ATKPercent",
-  "DEFPercent",
-  "ElementalMastery",
-  "CritRate",
-  "CritDMG",
-  "HealingBonus",
-];
+export function gradient5StarKqmcArtifactSubstatOptimizer(
+  stats: StatTable,
+  target: Rotation,
+  flower: Artifact | undefined,
+  feather: Artifact | undefined,
+  sands: Artifact | undefined,
+  goblet: Artifact | undefined,
+  circlet: Artifact | undefined,
+  energyRechargeRequirement: number,
+): SubstatDistribution {
+  const builder = ArtifactBuilder.kqmc(
+    flower,
+    feather,
+    sands,
+    goblet,
+    circlet,
+  );
+
+  while (true) {
+    const combinedStats = stats.merge(builder.build());
+    if (combinedStats.get("EnergyRecharge") >= energyRechargeRequirement) {
+      break;
+    }
+    if (
+      builder.rollsLeft() <= 0 ||
+      builder.rollsLeftForGiven("EnergyRecharge", "AVG", 5) <= 0
+    ) {
+      throw new Error(
+        "Energy Recharge requirements cannot be met with substats alone",
+      );
+    }
+    builder.roll("EnergyRecharge", "AVG", 5, 1);
+  }
+
+  const possibleSubsToRoll = new Set<StatType>(POSSIBLE_SUB_STATS);
+
+  while (builder.rollsLeft() > 0 && possibleSubsToRoll.size > 0) {
+    let bestSub: StatType = "None";
+    let bestValue = Number.NEGATIVE_INFINITY;
+
+    for (const substat of possibleSubsToRoll) {
+      if (
+        builder.currentRollsForGiven(substat, "AVG", 5) >=
+        builder.substatConstraint(substat, 5)
+      ) {
+        continue;
+      }
+
+      builder.roll(substat, "AVG", 5, 1);
+      const value = target.execute(stats.merge(builder.build()));
+      builder.unroll(substat, "AVG", 5, 1);
+
+      if (value > bestValue) {
+        bestValue = value;
+        bestSub = substat;
+      }
+    }
+
+    if (bestSub === "None") {
+      break;
+    }
+
+    builder.roll(bestSub, "AVG", 5, 1);
+  }
+
+  const distribution: SubstatDistribution = new Map();
+  for (const [[stat], count] of builder.rolls.entries()) {
+    distribution.set(stat, (distribution.get(stat) || 0) + count);
+  }
+
+  return distribution;
+}
+
+export function optimalKqmc5ArtifactsStats(
+  stats: StatTable,
+  target: Rotation,
+  energyRechargeRequirement: number,
+  getMainStatValue: (stat: StatType) => number,
+): StatTable {
+  const [sandsMain, gobletMain, circletMain] =
+    globalKqmcArtifactMainStatOptimizer(stats, target, getMainStatValue);
+
+  const flower: Artifact = {
+    type: "flower",
+    rarity: 5,
+    level: 20,
+    main_stat: "FlatHP",
+  };
+  const feather: Artifact = {
+    type: "feather",
+    rarity: 5,
+    level: 20,
+    main_stat: "FlatATK",
+  };
+  const sands: Artifact = {
+    type: "sands",
+    rarity: 5,
+    level: 20,
+    main_stat: sandsMain,
+  };
+  const goblet: Artifact = {
+    type: "goblet",
+    rarity: 5,
+    level: 20,
+    main_stat: gobletMain,
+  };
+  const circlet: Artifact = {
+    type: "circlet",
+    rarity: 5,
+    level: 20,
+    main_stat: circletMain,
+  };
+
+  const builder = new ArtifactBuilder(flower, feather, sands, goblet, circlet);
+  const optimalSubstats = gradient5StarKqmcArtifactSubstatOptimizer(
+    stats,
+    target,
+    flower,
+    feather,
+    sands,
+    goblet,
+    circlet,
+    energyRechargeRequirement,
+  );
+
+  for (const [stat, count] of optimalSubstats.entries()) {
+    builder.roll(stat, "AVG", 5, count);
+  }
+
+  return stats.merge(builder.build());
+}
+
+/** Ecapsulated implementation */
 
 // Computes gradients of stats based on slopes
 function statGradients(
@@ -124,10 +243,3 @@ function globalKqmcArtifactMainStatOptimizer(
   return bestCombo;
 }
 
-export function optimalMainStats(
-  stats: StatTable,
-  rotation: Rotation,
-  getMainStatValue: (stat: StatType) => number,
-): [StatType, StatType, StatType] {
-  return globalKqmcArtifactMainStatOptimizer(stats, rotation, getMainStatValue);
-}

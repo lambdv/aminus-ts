@@ -24,6 +24,34 @@ export class ArtifactBuilder {
   rolls: Map<[StatType, ArtifactRollQuality, number], number> = new Map();
   constraints: Map<[StatType, number], number> = new Map();
   rollLimit?: number;
+
+  private findRollKey(
+    statType: StatType,
+    quality: ArtifactRollQuality,
+    rarity: number,
+  ): [StatType, ArtifactRollQuality, number] | undefined {
+    for (const key of this.rolls.keys()) {
+      if (key[0] === statType && key[1] === quality && key[2] === rarity) {
+        return key;
+      }
+    }
+    return undefined;
+  }
+
+  private getConstraint(statType: StatType, rarity: number): number {
+    let sum = 0;
+    for (const [[stat, r], count] of this.constraints.entries()) {
+      if (stat === statType && r === rarity) {
+        sum += count;
+      }
+    }
+    return sum;
+  }
+
+  private addConstraint(statType: StatType, rarity: number, amount: number): void {
+    const key: [StatType, number] = [statType, rarity];
+    this.constraints.set(key, amount);
+  }
   //general constructor to building any set of artifacts
   constructor(
     flower?: Artifact,
@@ -52,9 +80,12 @@ export class ArtifactBuilder {
       ].filter((p) => p !== undefined) as Artifact[];
       for (const piece of pieces) {
         if (piece.main_stat !== stat) {
-          const key: [StatType, number] = [stat, piece.rarity];
-          const current = this.constraints.get(key) || 0;
-          this.constraints.set(key, current + maxRollsForGiven(piece, stat));
+          const current = this.getConstraint(stat, piece.rarity);
+          this.addConstraint(
+            stat,
+            piece.rarity,
+            current + maxRollsForGiven(piece, stat),
+          );
         }
       }
     }
@@ -102,8 +133,8 @@ export class ArtifactBuilder {
     for (const stat of POSSIBLE_SUB_STATS) {
       for (const piece of pieces) {
         if (piece.main_stat !== stat) {
-          const key: [StatType, number] = [stat, piece.rarity];
-          builder.constraints.set(key, (builder.constraints.get(key) || 0) + 2);
+          const current = builder.getConstraint(stat, piece.rarity);
+          builder.addConstraint(stat, piece.rarity, current + 2);
         }
       }
     }
@@ -115,8 +146,8 @@ export class ArtifactBuilder {
     // Roll 2 of each substat at AVG quality and rollRarity
     for (const stat of POSSIBLE_SUB_STATS) {
       builder.roll(stat, "AVG", rollRarity, 2);
-      const key: [StatType, number] = [stat, rollRarity];
-      builder.constraints.set(key, (builder.constraints.get(key) || 0) + 2);
+      const current = builder.getConstraint(stat, rollRarity);
+      builder.addConstraint(stat, rollRarity, current + 2);
     }
 
     return builder;
@@ -274,12 +305,13 @@ export class ArtifactBuilder {
     if (current + num > this.substatConstraint(substatValue, rarity))
       throw new Error("Exceeds constraint");
 
-    const key: [StatType, ArtifactRollQuality, number] = [
-      substatValue,
-      quality,
-      rarity,
-    ];
-    this.rolls.set(key, (this.rolls.get(key) || 0) + num);
+    const existingKey = this.findRollKey(substatValue, quality, rarity);
+    if (existingKey) {
+      this.rolls.set(existingKey, (this.rolls.get(existingKey) || 0) + num);
+      return;
+    }
+    const key: [StatType, ArtifactRollQuality, number] = [substatValue, quality, rarity];
+    this.rolls.set(key, num);
   }
 
   unroll(
@@ -291,11 +323,9 @@ export class ArtifactBuilder {
     if (!isValidSubstatType(substatValue))
       throw new Error("Invalid substat type");
 
-    const key: [StatType, ArtifactRollQuality, number] = [
-      substatValue,
-      quality,
-      rarity,
-    ];
+    const key = this.findRollKey(substatValue, quality, rarity);
+    if (!key) return;
+
     const current = this.rolls.get(key) || 0;
     if (current >= num) {
       const newValue = current - num;
@@ -316,11 +346,8 @@ export class ArtifactBuilder {
     quality: ArtifactRollQuality,
     rarity: number,
   ): number {
-    const key: [StatType, ArtifactRollQuality, number] = [
-      statType,
-      quality,
-      rarity,
-    ];
+    const key = this.findRollKey(statType, quality, rarity);
+    if (!key) return 0;
     return this.rolls.get(key) || 0;
   }
 
@@ -338,8 +365,7 @@ export class ArtifactBuilder {
   }
 
   substatConstraint(statType: StatType, rarity: number): number {
-    const key: [StatType, number] = [statType, rarity];
-    return this.constraints.get(key) || 0;
+    return this.getConstraint(statType, rarity);
   }
 
   rollsLeft(): number {
