@@ -1,90 +1,37 @@
-import { StatTable, Rotation } from "@/core/stat";
-import { calculate_damage } from "@/core/formulas";
-import {
-  optimalMainStats,
-  ArtifactBuilder,
-  ArtifactPiece,
-} from "@/core/artifacts";
-
-describe("optimalMainStats", () => {
-  it("should find the best main stats for a basic ATK-focused character", () => {
-    const stats = new StatTable(
-      ["BaseATK", 100.0],
-      ["ATKPercent", 0.5],
-      ["FlatATK", 100.0],
-      ["CritRate", 0.05],
-      ["CritDMG", 0.5],
-    );
-
-    const target = new Rotation([
-      [
-        "atk1",
-        (s: StatTable) =>
-          calculate_damage(
-            "Pyro",
-            "Normal",
-            "ATK",
-            "None",
-            1.0,
-            1.0,
-            s,
-            undefined,
-          ),
-      ],
-    ]);
-
-    const result = optimalMainStats(stats, target);
-    expect(result).toEqual(["ATKPercent", "PyroDMGBonus", "ATKPercent"]);
-  });
-
-  it("should handle empty stats", () => {
-    const stats = new StatTable();
-    const target = new Rotation([
-      [
-        "atk1",
-        (s: StatTable) =>
-          calculate_damage(
-            "Pyro",
-            "Normal",
-            "ATK",
-            "None",
-            1.0,
-            1.0,
-            s,
-            undefined,
-          ),
-      ],
-    ]);
-
-    const result = optimalMainStats(stats, target);
-    // Should return some valid combination
-    expect(result).toBeDefined();
-    expect(result.length).toBe(3);
-  });
-});
+import { StatTable } from "@/core/stat";
+import { ArtifactBuilder, Artifact } from "@/core/artifacts";
 
 describe("ArtifactBuilder", () => {
   it("should create a basic artifact builder", () => {
-    const flower: ArtifactPiece = { rarity: 5, level: 20, stat_type: "FlatHP" };
-    const feather: ArtifactPiece = {
+    const flower: Artifact = {
+      type: "flower",
       rarity: 5,
       level: 20,
-      stat_type: "FlatATK",
+      main_stat: "FlatHP",
     };
-    const sands: ArtifactPiece = {
+    const feather: Artifact = {
+      type: "feather",
       rarity: 5,
       level: 20,
-      stat_type: "ATKPercent",
+      main_stat: "FlatATK",
     };
-    const goblet: ArtifactPiece = {
+    const sands: Artifact = {
+      type: "sands",
       rarity: 5,
       level: 20,
-      stat_type: "PyroDMGBonus",
+      main_stat: "ATKPercent",
     };
-    const circlet: ArtifactPiece = {
+    const goblet: Artifact = {
+      type: "goblet",
       rarity: 5,
       level: 20,
-      stat_type: "CritRate",
+      main_stat: "PyroDMGBonus",
+    };
+    const circlet: Artifact = {
+      type: "circlet",
+      rarity: 5,
+      level: 20,
+      main_stat: "CritRate",
     };
 
     const builder = new ArtifactBuilder(
@@ -104,11 +51,11 @@ describe("ArtifactBuilder", () => {
 
   it("should create builder with correct main stats", () => {
     const bob = new ArtifactBuilder(
-      { rarity: 5, level: 20, stat_type: "FlatHP" },
-      { rarity: 5, level: 20, stat_type: "FlatATK" },
-      { rarity: 5, level: 20, stat_type: "EnergyRecharge" },
-      { rarity: 5, level: 20, stat_type: "ATKPercent" },
-      { rarity: 5, level: 20, stat_type: "ATKPercent" },
+      { type: "flower", rarity: 5, level: 20, main_stat: "FlatHP" },
+      { type: "feather", rarity: 5, level: 20, main_stat: "FlatATK" },
+      { type: "sands", rarity: 5, level: 20, main_stat: "EnergyRecharge" },
+      { type: "goblet", rarity: 5, level: 20, main_stat: "ATKPercent" },
+      { type: "circlet", rarity: 5, level: 20, main_stat: "ATKPercent" },
     );
 
     const expected = new StatTable(
