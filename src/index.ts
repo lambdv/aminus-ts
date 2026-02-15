@@ -3,6 +3,7 @@ export * from "./core/stat.js";
 export * from "./core/formulas.js";
 export * from "./core/artifacts.js";
 export * from "./core/rng.js";
+export * from "./core/optimizer.js";
 
 // Engine exports
 export * from "./engine/graph.js";

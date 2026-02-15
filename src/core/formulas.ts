@@ -291,20 +291,155 @@ const dmg_formula =
     scaling: BaseScaling = "ATK",
     amplifier: Amplifier = "None",
   ) =>
-  (s: StatTable) =>
-    default_damage_formula(
+  (s: StatTable) => {
+    const total = s.clone();
+    if (buffs) {
+      for (const [key, value] of buffs) {
+        total.add(key, value);
+      }
+    }
+
+    let total_base_scaling_stat: number;
+    switch (scaling) {
+      case "ATK":
+        total_base_scaling_stat = total_attack(total);
+        break;
+      case "DEF":
+        total_base_scaling_stat = total_defense(total);
+        break;
+      default:
+        total_base_scaling_stat = total_health(total);
+        break;
+    }
+
+    let amp_multiplier: number;
+    switch (amplifier) {
+      case "Forward":
+        amp_multiplier = amplifier_multiplier(
+          2.0,
+          total.get("ElementalMastery"),
+          total.get("ReactionBonus"),
+        );
+        break;
+      case "Reverse":
+        amp_multiplier = amplifier_multiplier(
+          1.5,
+          total.get("ElementalMastery"),
+          total.get("ReactionBonus"),
+        );
+        break;
+      default:
+        amp_multiplier = 1.0;
+        break;
+    }
+
+    let element_dmg_bonus: number;
+    switch (element) {
+      case "Pyro":
+        element_dmg_bonus = total.get("PyroDMGBonus");
+        break;
+      case "Hydro":
+        element_dmg_bonus = total.get("HydroDMGBonus");
+        break;
+      case "Electro":
+        element_dmg_bonus = total.get("ElectroDMGBonus");
+        break;
+      case "Anemo":
+        element_dmg_bonus = total.get("AnemoDMGBonus");
+        break;
+      case "Geo":
+        element_dmg_bonus = total.get("GeoDMGBonus");
+        break;
+      case "Dendro":
+        element_dmg_bonus = total.get("DendroDMGBonus");
+        break;
+      case "Cryo":
+        element_dmg_bonus = total.get("CryoDMGBonus");
+        break;
+      case "Physical":
+        element_dmg_bonus = total.get("PhysicalDMGBonus");
+        break;
+      default:
+        element_dmg_bonus = 0.0;
+        break;
+    }
+
+    let attack_type_dmg_bonus: number;
+    switch (damage_type) {
+      case "Normal":
+        attack_type_dmg_bonus = total.get("NormalATKDMGBonus");
+        break;
+      case "Charged":
+        attack_type_dmg_bonus = total.get("ChargeATKDMGBonus");
+        break;
+      case "Plunging":
+        attack_type_dmg_bonus = total.get("PlungeATKDMGBonus");
+        break;
+      case "Skill":
+        attack_type_dmg_bonus = total.get("SkillDMGBonus");
+        break;
+      case "Burst":
+        attack_type_dmg_bonus = total.get("BurstDMGBonus");
+        break;
+      default:
+        attack_type_dmg_bonus = 0.0;
+        break;
+    }
+
+    const total_dmg_bonus =
+      (total.get("DMGBonus") || 0) +
+      (total.get("ElementalDMGBonus") || 0) +
+      element_dmg_bonus +
+      attack_type_dmg_bonus;
+
+    const def_reduction = total.get("DefReduction") || 0;
+    const def_ignore = total.get("DefIgnore") || 0;
+
+    let resistance_reduction: number;
+    switch (element) {
+      case "Pyro":
+        resistance_reduction = total.get("PyroResistanceReduction");
+        break;
+      case "Hydro":
+        resistance_reduction = total.get("HydroResistanceReduction");
+        break;
+      case "Electro":
+        resistance_reduction = total.get("ElectroResistanceReduction");
+        break;
+      case "Anemo":
+        resistance_reduction = total.get("AnemoResistanceReduction");
+        break;
+      case "Geo":
+        resistance_reduction = total.get("GeoResistanceReduction");
+        break;
+      case "Dendro":
+        resistance_reduction = total.get("DendroResistanceReduction");
+        break;
+      case "Cryo":
+        resistance_reduction = total.get("CryoResistanceReduction");
+        break;
+      case "Physical":
+        resistance_reduction = total.get("PhysicalResistanceReduction");
+        break;
+      default:
+        resistance_reduction = 0.0;
+        break;
+    }
+
+    return default_damage_formula(
       instances,
-      total_attack(s),
-      1.0,
+      total_base_scaling_stat,
+      motion_value,
       1.0,
       0.0,
-      avg_crit_multiplier(s),
+      avg_crit_multiplier(total),
+      total_dmg_bonus,
       0.0,
-      0.0,
-      def_multiplier(90, 100, 0.0, 0.0),
-      res_multiplier(0.1, 0.0),
-      1.0,
+      def_multiplier(90, 100, def_reduction, def_ignore),
+      res_multiplier(0.1, resistance_reduction),
+      amp_multiplier,
     );
+  };
 
 export {
   default_damage_formula,
