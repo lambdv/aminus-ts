@@ -1,7 +1,6 @@
 import { StatType, StatTable, Rotation } from "./stat";
 
 export type { ArtifactPiece };
-export { RollQuality };
 
 type ArtifacType = "flower" | "feather" | "sands" | "goblet" | "circlet";
 
@@ -13,15 +12,7 @@ type Artifact = {
   substats?: StatTable;
 };
 
-type ArtifactRollQuality = "MAX" | "HIGH" | "MID" | "LOW" | "AVG";
-
-enum RollQuality {
-  MAX,
-  HIGH,
-  MID,
-  LOW,
-  AVG, // Average of MAX, HIGH, MID, LOW
-}
+export type ArtifactRollQuality = "MAX" | "HIGH" | "MID" | "LOW" | "AVG";
 
 type ArtifactPiece = {
   rarity: number;
@@ -29,19 +20,18 @@ type ArtifactPiece = {
   stat_type: StatType;
 };
 
-
 /** returns multiplier for a given roll quality */
-function rollQualityMultiplier(quality: RollQuality): number {
+function rollQualityMultiplier(quality: ArtifactRollQuality): number {
   switch (quality) {
-    case RollQuality.MAX:
+    case "MAX":
       return 1.0;
-    case RollQuality.HIGH:
+    case "HIGH":
       return 0.9;
-    case RollQuality.MID:
+    case "MID":
       return 0.8;
-    case RollQuality.LOW:
+    case "LOW":
       return 0.7;
-    case RollQuality.AVG:
+    case "AVG":
       return (1.0 + 0.9 + 0.8 + 0.7) / 4.0;
     default:
       return 1.0;
@@ -49,9 +39,7 @@ function rollQualityMultiplier(quality: RollQuality): number {
 }
 
 /** returns max number of rolls for a given artifact piece */
-function maxRollsFor(
-  artifact: ArtifactPiece,
-): number {
+function maxRollsFor(artifact: ArtifactPiece): number {
   const baseSubstats = artifact.rarity - 1;
   const upgrades = Math.floor(artifact.level / 4);
   return baseSubstats + upgrades;
@@ -72,7 +60,7 @@ function isValidSubstatType(statType: StatType): boolean {
   return POSSIBLE_SUB_STATS.includes(statType);
 }
 
-const validate_artifact_pieces = (  
+const validate_artifact_pieces = (
   flower?: ArtifactPiece,
   feather?: ArtifactPiece,
   sands?: ArtifactPiece,
@@ -89,7 +77,7 @@ const validate_artifact_pieces = (
     throw new Error("Invalid goblet main stat");
   if (circlet && !POSSIBLE_CIRCLE_STATS.includes(circlet.stat_type))
     throw new Error("Invalid circlet main stat");
-}
+};
 
 export class ArtifactBuilder {
   flower?: ArtifactPiece;
@@ -97,7 +85,7 @@ export class ArtifactBuilder {
   sands?: ArtifactPiece;
   goblet?: ArtifactPiece;
   circlet?: ArtifactPiece;
-  rolls: Map<[StatType, RollQuality, number], number> = new Map();
+  rolls: Map<[StatType, ArtifactRollQuality, number], number> = new Map();
   constraints: Map<[StatType, number], number> = new Map();
   rollLimit?: number;
   //general constructor to building any set of artifacts
@@ -130,10 +118,7 @@ export class ArtifactBuilder {
         if (piece.stat_type !== stat) {
           const key: [StatType, number] = [stat, piece.rarity];
           const current = this.constraints.get(key) || 0;
-          this.constraints.set(
-            key,
-            current + maxRollsForGiven(piece, stat),
-          );
+          this.constraints.set(key, current + maxRollsForGiven(piece, stat));
         }
       }
     }
@@ -193,7 +178,7 @@ export class ArtifactBuilder {
 
     // Roll 2 of each substat at AVG quality and rollRarity
     for (const stat of POSSIBLE_SUB_STATS) {
-      builder.roll(stat, RollQuality.AVG, rollRarity, 2);
+      builder.roll(stat, "AVG", rollRarity, 2);
       const key: [StatType, number] = [stat, rollRarity];
       builder.constraints.set(key, (builder.constraints.get(key) || 0) + 2);
     }
@@ -229,8 +214,8 @@ export class ArtifactBuilder {
     );
 
     for (const stat of POSSIBLE_SUB_STATS) {
-      builder.unroll(stat, RollQuality.AVG, 5, 2);
-      builder.roll(stat, RollQuality.AVG, 4, 2);
+      builder.unroll(stat, "AVG", 5, 2);
+      builder.roll(stat, "AVG", 4, 2);
     }
 
     return builder;
@@ -282,8 +267,8 @@ export class ArtifactBuilder {
     );
 
     for (const stat of POSSIBLE_SUB_STATS) {
-      builder.unroll(stat, RollQuality.AVG, 5, 2);
-      builder.roll(stat, RollQuality.AVG, 4, 2);
+      builder.unroll(stat, "AVG", 5, 2);
+      builder.roll(stat, "AVG", 4, 2);
     }
 
     return builder;
@@ -325,7 +310,7 @@ export class ArtifactBuilder {
 
   roll(
     substatValue: StatType,
-    quality: RollQuality,
+    quality: ArtifactRollQuality,
     rarity: number,
     num: number,
   ): void {
@@ -335,7 +320,7 @@ export class ArtifactBuilder {
     if (current + num > this.substatConstraint(substatValue, rarity))
       throw new Error("Exceeds constraint");
 
-    const key: [StatType, RollQuality, number] = [
+    const key: [StatType, ArtifactRollQuality, number] = [
       substatValue,
       quality,
       rarity,
@@ -345,14 +330,14 @@ export class ArtifactBuilder {
 
   unroll(
     substatValue: StatType,
-    quality: RollQuality,
+    quality: ArtifactRollQuality,
     rarity: number,
     num: number,
   ): void {
     if (!isValidSubstatType(substatValue))
       throw new Error("Invalid substat type");
 
-    const key: [StatType, RollQuality, number] = [
+    const key: [StatType, ArtifactRollQuality, number] = [
       substatValue,
       quality,
       rarity,
@@ -374,10 +359,14 @@ export class ArtifactBuilder {
 
   currentRollsForGiven(
     statType: StatType,
-    quality: RollQuality,
+    quality: ArtifactRollQuality,
     rarity: number,
   ): number {
-    const key: [StatType, RollQuality, number] = [statType, quality, rarity];
+    const key: [StatType, ArtifactRollQuality, number] = [
+      statType,
+      quality,
+      rarity,
+    ];
     return this.rolls.get(key) || 0;
   }
 
@@ -405,7 +394,7 @@ export class ArtifactBuilder {
 
   rollsLeftForGiven(
     statType: StatType,
-    quality: RollQuality,
+    quality: ArtifactRollQuality,
     rarity: number,
   ): number {
     return (
@@ -418,38 +407,9 @@ export class ArtifactBuilder {
 export function optimalMainStats(
   stats: StatTable,
   rotation: Rotation,
-  constraints?: MainStatConstraints,
 ): [StatType, StatType, StatType] {
   return globalKqmcArtifactMainStatOptimizer(stats, rotation);
 }
-
-type MainStatConstraints = {
-  flower: {
-    rarity?: number;
-    type?: ArtifacType;
-    level?: number;
-  };
-  feather: {
-    rarity?: number;
-    type?: ArtifacType;
-    level?: number;
-  };
-  sands: {
-    rarity?: number;
-    type?: ArtifacType;
-    level?: number;
-  };
-  goblet: {
-    rarity?: number;
-    type?: ArtifacType;
-    level?: number;
-  };
-  circlet: {
-    rarity?: number;
-    type?: ArtifacType;
-    level?: number;
-  };
-};
 
 // Constants for possible main stats
 const POSSIBLE_SANDS_STATS: StatType[] = [

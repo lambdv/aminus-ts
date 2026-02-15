@@ -1,0 +1,6 @@
+Refactor artifact handling: streamline validation and improve roll calculations
+Add coverage to .gitignore
+added more testing and paroty with rs lib
+Convert StatType to STAT_TYPES array
+Add simple damage graph engine and tests
+hello world

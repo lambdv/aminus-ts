@@ -3,7 +3,7 @@ import { calculate_damage } from "@/core/formulas";
 import {
   optimalMainStats,
   ArtifactBuilder,
-  ArtifactPiece,
+  Artifact,
 } from "@/core/artifacts";
 
 describe("optimalMainStats", () => {
@@ -65,26 +65,30 @@ describe("optimalMainStats", () => {
 
 describe("ArtifactBuilder", () => {
   it("should create a basic artifact builder", () => {
-    const flower: ArtifactPiece = { rarity: 5, level: 20, stat_type: "FlatHP" };
-    const feather: ArtifactPiece = {
+    const flower: Artifact = { type: "flower", rarity: 5, level: 20, main_stat: "FlatHP" };
+    const feather: Artifact = {
+      type: "feather",
       rarity: 5,
       level: 20,
-      stat_type: "FlatATK",
+      main_stat: "FlatATK",
     };
-    const sands: ArtifactPiece = {
+    const sands: Artifact = {
+      type: "sands",
       rarity: 5,
       level: 20,
-      stat_type: "ATKPercent",
+      main_stat: "ATKPercent",
     };
-    const goblet: ArtifactPiece = {
+    const goblet: Artifact = {
+      type: "goblet",
       rarity: 5,
       level: 20,
-      stat_type: "PyroDMGBonus",
+      main_stat: "PyroDMGBonus",
     };
-    const circlet: ArtifactPiece = {
+    const circlet: Artifact = {
+      type: "circlet",
       rarity: 5,
       level: 20,
-      stat_type: "CritRate",
+      main_stat: "CritRate",
     };
 
     const builder = new ArtifactBuilder(
@@ -104,11 +108,11 @@ describe("ArtifactBuilder", () => {
 
   it("should create builder with correct main stats", () => {
     const bob = new ArtifactBuilder(
-      { rarity: 5, level: 20, stat_type: "FlatHP" },
-      { rarity: 5, level: 20, stat_type: "FlatATK" },
-      { rarity: 5, level: 20, stat_type: "EnergyRecharge" },
-      { rarity: 5, level: 20, stat_type: "ATKPercent" },
-      { rarity: 5, level: 20, stat_type: "ATKPercent" },
+      { type: "flower", rarity: 5, level: 20, main_stat: "FlatHP" },
+      { type: "feather", rarity: 5, level: 20, main_stat: "FlatATK" },
+      { type: "sands", rarity: 5, level: 20, main_stat: "EnergyRecharge" },
+      { type: "goblet", rarity: 5, level: 20, main_stat: "ATKPercent" },
+      { type: "circlet", rarity: 5, level: 20, main_stat: "ATKPercent" },
     );
 
     const expected = new StatTable(
