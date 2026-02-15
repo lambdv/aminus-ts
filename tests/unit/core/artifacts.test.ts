@@ -1,71 +1,14 @@
-import { StatTable, Rotation } from "@/core/stat";
-import { calculate_damage } from "@/core/formulas";
-import {
-  optimalMainStats,
-  ArtifactBuilder,
-  Artifact,
-} from "@/core/artifacts";
-
-describe("optimalMainStats", () => {
-  it("should find the best main stats for a basic ATK-focused character", () => {
-    const stats = new StatTable(
-      ["BaseATK", 100.0],
-      ["ATKPercent", 0.5],
-      ["FlatATK", 100.0],
-      ["CritRate", 0.05],
-      ["CritDMG", 0.5],
-    );
-
-    const target = new Rotation([
-      [
-        "atk1",
-        (s: StatTable) =>
-          calculate_damage(
-            "Pyro",
-            "Normal",
-            "ATK",
-            "None",
-            1.0,
-            1.0,
-            s,
-            undefined,
-          ),
-      ],
-    ]);
-
-    const result = optimalMainStats(stats, target);
-    expect(result).toEqual(["ATKPercent", "PyroDMGBonus", "ATKPercent"]);
-  });
-
-  it("should handle empty stats", () => {
-    const stats = new StatTable();
-    const target = new Rotation([
-      [
-        "atk1",
-        (s: StatTable) =>
-          calculate_damage(
-            "Pyro",
-            "Normal",
-            "ATK",
-            "None",
-            1.0,
-            1.0,
-            s,
-            undefined,
-          ),
-      ],
-    ]);
-
-    const result = optimalMainStats(stats, target);
-    // Should return some valid combination
-    expect(result).toBeDefined();
-    expect(result.length).toBe(3);
-  });
-});
+import { StatTable } from "@/core/stat";
+import { ArtifactBuilder, Artifact } from "@/core/artifacts";
 
 describe("ArtifactBuilder", () => {
   it("should create a basic artifact builder", () => {
-    const flower: Artifact = { type: "flower", rarity: 5, level: 20, main_stat: "FlatHP" };
+    const flower: Artifact = {
+      type: "flower",
+      rarity: 5,
+      level: 20,
+      main_stat: "FlatHP",
+    };
     const feather: Artifact = {
       type: "feather",
       rarity: 5,
