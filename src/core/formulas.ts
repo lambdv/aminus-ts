@@ -1,455 +1,218 @@
-import {
-  StatTable,
-  DamageCompute,
-  DamageType,
-  BaseScaling,
-  Amplifier,
-  Element,
-} from "./stat";
-function default_damage_formula(
-  instances: number,
-  total_scaling_stat: number,
-  motion_value: number,
-  base_dmg_multiplier: number,
-  additive_base_dmg_bonus: number,
-  avg_crit_multiplier: number,
-  total_dmg_bonus: number,
-  dmg_reduction_target: number,
-  def_multiplier: number,
-  res_multiplier: number,
-  amplifier_multiplier: number,
-): number {
-  return (
-    (total_scaling_stat * motion_value * base_dmg_multiplier +
-      additive_base_dmg_bonus) *
-    avg_crit_multiplier *
-    (1.0 + total_dmg_bonus - dmg_reduction_target) *
-    def_multiplier *
-    res_multiplier *
-    amplifier_multiplier *
-    instances
+import { avg_crit_multiplier, def_multiplier, res_multiplier, amplifier_multiplier } from "./multipliers.js";
+import { REACTION_LEVEL_MULTIPLIERS } from "../data/reaction-levels.js";
+import { BaseScaling, DamageCompute, DamageType, Element, StatTable, StatType } from "./stat.js";
+
+/** Percentages are fractions: 0.1 means 10%. */
+export interface DamageContext {
+  characterLevel?: number;
+  enemyLevel?: number;
+  enemyResistance?: Partial<Record<Element, number>>;
+}
+
+export interface HitModifiers {
+  percentScalingBonus?: number;
+  flatScalingBonus?: number;
+  elementalMasteryBonus?: number;
+  critRateBonus?: number;
+  critDamageBonus?: number;
+  damageBonus?: number;
+  /** Target-side damage reduction, subtracted from the damage-bonus factor. */
+  damageReduction?: number;
+  /** Positive fractions reduce resistance. */
+  resistanceReduction?: number;
+  /** Positive fractions reduce defense or ignore it, respectively. */
+  defenseReduction?: number;
+  defenseIgnore?: number;
+}
+
+export interface CharacterDamageOptions extends DamageContext, HitModifiers {
+  element: Element;
+  damageType: DamageType;
+  scaling?: BaseScaling;
+  motionValue?: number;
+  /** Flat base damage, added after the talent base multiplier. */
+  additiveDamage?: number;
+  /** Multiplies talent damage only, before additive base damage. */
+  baseDamageMultiplier?: number;
+  instances?: number;
+  buffs?: StatTable;
+}
+
+const elementStat: Partial<Record<Element, StatType>> = {
+  Physical: "PhysicalDMGBonus", Pyro: "PyroDMGBonus", Hydro: "HydroDMGBonus",
+  Electro: "ElectroDMGBonus", Cryo: "CryoDMGBonus", Dendro: "DendroDMGBonus",
+  Anemo: "AnemoDMGBonus", Geo: "GeoDMGBonus",
+};
+const resistanceStat: Partial<Record<Element, StatType>> = {
+  Physical: "PhysicalResistanceReduction", Pyro: "PyroResistanceReduction",
+  Hydro: "HydroResistanceReduction", Electro: "ElectroResistanceReduction",
+  Cryo: "CryoResistanceReduction", Dendro: "DendroResistanceReduction",
+  Anemo: "AnemoResistanceReduction", Geo: "GeoResistanceReduction",
+};
+const attackStat: Partial<Record<DamageType, StatType>> = {
+  Normal: "NormalATKDMGBonus", Charged: "ChargeATKDMGBonus",
+  Plunging: "PlungeATKDMGBonus", Skill: "SkillDMGBonus", Burst: "BurstDMGBonus",
+};
+
+function withBuffs(stats: StatTable, buffs?: StatTable): StatTable {
+  return buffs ? stats.merge(buffs) : stats.clone();
+}
+
+export function scalingValue(stats: StatTable, scaling: BaseScaling, modifiers: HitModifiers = {}): number {
+  if (scaling === "BaseATK") return stats.get("BaseATK");
+  if (scaling === "EM") return stats.get("ElementalMastery") + (modifiers.elementalMasteryBonus ?? 0);
+  const [base, percent, flat] = scaling === "HP"
+    ? ["BaseHP", "HPPercent", "FlatHP"] as const
+    : scaling === "DEF"
+      ? ["BaseDEF", "DEFPercent", "FlatDEF"] as const
+      : ["BaseATK", "ATKPercent", "FlatATK"] as const;
+  return stats.get(base) * (1 + stats.get(percent) + (modifiers.percentScalingBonus ?? 0))
+    + stats.get(flat) + (modifiers.flatScalingBonus ?? 0);
+}
+
+function critFactor(stats: StatTable, modifiers: HitModifiers = {}): number {
+  const adjusted = stats.clone();
+  adjusted.add("CritRate", modifiers.critRateBonus ?? 0);
+  adjusted.add("CritDMG", modifiers.critDamageBonus ?? 0);
+  return avg_crit_multiplier(adjusted);
+}
+
+function damageBonus(stats: StatTable, element: Element, damageType: DamageType, extra = 0): number {
+  return stats.get("DMGBonus")
+    + (element !== "Physical" && element !== "None" ? stats.get("ElementalDMGBonus") : 0)
+    + (elementStat[element] ? stats.get(elementStat[element]!) : 0)
+    + (attackStat[damageType] ? stats.get(attackStat[damageType]!) : 0)
+    + extra;
+}
+
+function defenseFactor(stats: StatTable, options: DamageContext & HitModifiers): number {
+  return def_multiplier(
+    options.characterLevel ?? 90,
+    options.enemyLevel ?? 100,
+    stats.get("DefReduction") + (options.defenseReduction ?? 0),
+    stats.get("DefIgnore") + (options.defenseIgnore ?? 0),
   );
 }
 
-const total_attack = (stats: StatTable): number => {
-  const base_atk = stats.get("BaseATK");
-  if (base_atk === undefined)
-    throw new Error("StatTable must have BaseATK to calculate total attack");
-  const atk_percent = stats.get("ATKPercent") || 0;
-  const flat_atk = stats.get("FlatATK") || 0;
-  return base_atk * (1 + atk_percent) + flat_atk;
-};
-
-const total_defense = (stats: StatTable): number => {
-  const base_def = stats.get("BaseDEF");
-  if (base_def === undefined)
-    throw new Error("StatTable must have BaseDEF to calculate total defense");
-  const def_percent = stats.get("DEFPercent") || 0;
-  const flat_def = stats.get("FlatDEF") || 0;
-  return base_def * (1 + def_percent) + flat_def;
-};
-
-const total_health = (stats: StatTable): number => {
-  const base_hp = stats.get("BaseHP");
-  if (base_hp === undefined)
-    throw new Error("StatTable must have BaseHP to calculate total health");
-  const hp_percent = stats.get("HPPercent") || 0;
-  const flat_hp = stats.get("FlatHP") || 0;
-  return base_hp * (1 + hp_percent) + flat_hp;
-};
-
-const avg_crit_multiplier = (stats: StatTable): number => {
-  let cr = stats.get("CritRate");
-  cr = cr > 1.0 ? 1.0 : cr;
-  cr = cr < 0.0 ? 0.0 : cr;
-
-  const cd = stats.get("CritDMG");
-  return 1.0 + cr * cd;
-};
-
-const def_multiplier = (
-  character_level: number,
-  enemy_level: number,
-  def_reduction: number,
-  def_ignore: number,
-): number => {
-  if (character_level < 1 || character_level > 90)
-    throw new Error("character_level must be between 1 and 90");
-  if (enemy_level < 1) throw new Error("enemy_level must be at least 1");
-
-  return (
-    (character_level + 100.0) /
-    (character_level +
-      100.0 +
-      (enemy_level + 100.0) *
-        (1.0 - Math.min(def_reduction, 0.9)) *
-        (1.0 - def_ignore))
-  );
-};
-
-const res_multiplier = (
-  enemy_base_resistance: number,
-  resistance_reduction: number,
-): number => {
-  const resistance = enemy_base_resistance - resistance_reduction;
-  if (resistance < 0.0) {
-    return 1.0 - resistance / 2.0;
-  } else if (resistance < 0.75) {
-    return 1.0 - resistance;
-  } else {
-    return 1.0 / (4.0 * resistance + 1.0);
-  }
-};
-
-const amplifier_multiplier = (
-  amplifier: number,
-  elemental_mastery: number,
-  reaction_bonus: number,
-): number => {
-  return (
-    amplifier *
-    (1.0 +
-      (2.78 * elemental_mastery) / (1400.0 + elemental_mastery) +
-      reaction_bonus)
-  );
-};
-
-const calculate_damage = (
+function resistanceFactor(
+  stats: StatTable,
   element: Element,
-  damage_type: DamageType,
-  scaling: BaseScaling,
-  amplifier: Amplifier,
-  instances: number,
-  motion_value: number,
-  character: StatTable,
-  buffs: StatTable | undefined,
-): number => {
-  if (amplifier === "Forward" || amplifier === "Reverse") {
-    const validElements: Element[] = ["Pyro", "Hydro", "Cryo", "Anemo"];
-    if (!validElements.includes(element)) {
-      throw new Error(
-        `Amplifier ${amplifier} requires Pyro, Hydro, Cryo, or Anemo element`,
-      );
-    }
-  }
+  options: DamageContext & HitModifiers,
+): number {
+  const base = options.enemyResistance?.[element] ?? 0.1;
+  const reduction = resistanceStat[element] ? stats.get(resistanceStat[element]!) : 0;
+  return res_multiplier(base, reduction + (options.resistanceReduction ?? 0));
+}
 
-  const total = character.clone();
-  if (buffs) {
-    for (const [key, value] of buffs) {
-      total.add(key, value);
-    }
-  }
-  let total_base_scaling_stat: number;
-  switch (scaling) {
-    case "ATK":
-      total_base_scaling_stat = total_attack(total);
-      break;
-    case "DEF":
-      total_base_scaling_stat = total_defense(total);
-      break;
-    default:
-      total_base_scaling_stat = total_health(total);
-      break;
-  }
+function validateInstances(instances: number): void {
+  if (!Number.isFinite(instances) || instances < 0)
+    throw new Error("instances must be nonnegative and finite");
+}
 
-  let amp_multiplier: number;
-  switch (amplifier) {
-    case "Forward":
-      amp_multiplier = amplifier_multiplier(
-        2.0,
-        total.get("ElementalMastery"),
-        total.get("ReactionBonus"),
-      );
-      break;
-    case "Reverse":
-      amp_multiplier = amplifier_multiplier(
-        1.5,
-        total.get("ElementalMastery"),
-        total.get("ReactionBonus"),
-      );
-      break;
-    default:
-      amp_multiplier = 1.0;
-      break;
-  }
+export interface CharacterDamageBreakdown {
+  scalingValue: number;
+  baseDamage: number;
+  critMultiplier: number;
+  damageMultiplier: number;
+  resistanceMultiplier: number;
+  defenseMultiplier: number;
+  instances: number;
+  total: number;
+}
 
-  let element_dmg_bonus: number;
-  switch (element) {
-    case "Pyro":
-      element_dmg_bonus = total.get("PyroDMGBonus");
-      break;
-    case "Hydro":
-      element_dmg_bonus = total.get("HydroDMGBonus");
-      break;
-    case "Electro":
-      element_dmg_bonus = total.get("ElectroDMGBonus");
-      break;
-    case "Anemo":
-      element_dmg_bonus = total.get("AnemoDMGBonus");
-      break;
-    case "Geo":
-      element_dmg_bonus = total.get("GeoDMGBonus");
-      break;
-    case "Dendro":
-      element_dmg_bonus = total.get("DendroDMGBonus");
-      break;
-    case "Cryo":
-      element_dmg_bonus = total.get("CryoDMGBonus");
-      break;
-    case "Physical":
-      element_dmg_bonus = total.get("PhysicalDMGBonus");
-      break;
-    default:
-      element_dmg_bonus = 0.0;
-      break;
-  }
-
-  let attack_type_dmg_bonus: number;
-  switch (damage_type) {
-    case "Normal":
-      attack_type_dmg_bonus = total.get("NormalATKDMGBonus");
-      break;
-    case "Charged":
-      attack_type_dmg_bonus = total.get("ChargeATKDMGBonus");
-      break;
-    case "Plunging":
-      attack_type_dmg_bonus = total.get("PlungeATKDMGBonus");
-      break;
-    case "Skill":
-      attack_type_dmg_bonus = total.get("SkillDMGBonus");
-      break;
-    case "Burst":
-      attack_type_dmg_bonus = total.get("BurstDMGBonus");
-      break;
-    default:
-      attack_type_dmg_bonus = 0.0;
-      break;
-  }
-
-  const total_dmg_bonus =
-    total.get("DMGBonus") +
-    total.get("ElementalDMGBonus") +
-    element_dmg_bonus +
-    attack_type_dmg_bonus;
-
-  const def_reduction = total.get("DefReduction");
-  const def_ignore = total.get("DefIgnore");
-
-  let resistance_reduction: number;
-  switch (element) {
-    case "Pyro":
-      resistance_reduction = total.get("PyroResistanceReduction");
-      break;
-    case "Hydro":
-      resistance_reduction = total.get("HydroResistanceReduction");
-      break;
-    case "Electro":
-      resistance_reduction = total.get("ElectroResistanceReduction");
-      break;
-    case "Anemo":
-      resistance_reduction = total.get("AnemoResistanceReduction");
-      break;
-    case "Geo":
-      resistance_reduction = total.get("GeoResistanceReduction");
-      break;
-    case "Dendro":
-      resistance_reduction = total.get("DendroResistanceReduction");
-      break;
-    case "Cryo":
-      resistance_reduction = total.get("CryoResistanceReduction");
-      break;
-    case "Physical":
-      resistance_reduction = total.get("PhysicalResistanceReduction");
-      break;
-    default:
-      resistance_reduction = 0.0;
-      break;
-  }
-
-  return default_damage_formula(
-    instances,
-    total_base_scaling_stat,
-    motion_value,
-    1.0,
-    0.0,
-    avg_crit_multiplier(total),
-    total_dmg_bonus,
-    0.0,
-    def_multiplier(90, 100, def_reduction, def_ignore),
-    res_multiplier(0.1, resistance_reduction),
-    amp_multiplier,
-  );
-};
-
-const dmg_formula =
-  (
-    element: Element,
-    damage_type: DamageType,
-    motion_value: number,
-    instances = 1,
-    buffs: StatTable = new StatTable(),
-    scaling: BaseScaling = "ATK",
-    amplifier: Amplifier = "None",
-  ) =>
-  (s: StatTable) => {
-    const total = s.clone();
-    if (buffs) {
-      for (const [key, value] of buffs) {
-        total.add(key, value);
-      }
-    }
-
-    let total_base_scaling_stat: number;
-    switch (scaling) {
-      case "ATK":
-        total_base_scaling_stat = total_attack(total);
-        break;
-      case "DEF":
-        total_base_scaling_stat = total_defense(total);
-        break;
-      default:
-        total_base_scaling_stat = total_health(total);
-        break;
-    }
-
-    let amp_multiplier: number;
-    switch (amplifier) {
-      case "Forward":
-        amp_multiplier = amplifier_multiplier(
-          2.0,
-          total.get("ElementalMastery"),
-          total.get("ReactionBonus"),
-        );
-        break;
-      case "Reverse":
-        amp_multiplier = amplifier_multiplier(
-          1.5,
-          total.get("ElementalMastery"),
-          total.get("ReactionBonus"),
-        );
-        break;
-      default:
-        amp_multiplier = 1.0;
-        break;
-    }
-
-    let element_dmg_bonus: number;
-    switch (element) {
-      case "Pyro":
-        element_dmg_bonus = total.get("PyroDMGBonus");
-        break;
-      case "Hydro":
-        element_dmg_bonus = total.get("HydroDMGBonus");
-        break;
-      case "Electro":
-        element_dmg_bonus = total.get("ElectroDMGBonus");
-        break;
-      case "Anemo":
-        element_dmg_bonus = total.get("AnemoDMGBonus");
-        break;
-      case "Geo":
-        element_dmg_bonus = total.get("GeoDMGBonus");
-        break;
-      case "Dendro":
-        element_dmg_bonus = total.get("DendroDMGBonus");
-        break;
-      case "Cryo":
-        element_dmg_bonus = total.get("CryoDMGBonus");
-        break;
-      case "Physical":
-        element_dmg_bonus = total.get("PhysicalDMGBonus");
-        break;
-      default:
-        element_dmg_bonus = 0.0;
-        break;
-    }
-
-    let attack_type_dmg_bonus: number;
-    switch (damage_type) {
-      case "Normal":
-        attack_type_dmg_bonus = total.get("NormalATKDMGBonus");
-        break;
-      case "Charged":
-        attack_type_dmg_bonus = total.get("ChargeATKDMGBonus");
-        break;
-      case "Plunging":
-        attack_type_dmg_bonus = total.get("PlungeATKDMGBonus");
-        break;
-      case "Skill":
-        attack_type_dmg_bonus = total.get("SkillDMGBonus");
-        break;
-      case "Burst":
-        attack_type_dmg_bonus = total.get("BurstDMGBonus");
-        break;
-      default:
-        attack_type_dmg_bonus = 0.0;
-        break;
-    }
-
-    const total_dmg_bonus =
-      (total.get("DMGBonus") || 0) +
-      (total.get("ElementalDMGBonus") || 0) +
-      element_dmg_bonus +
-      attack_type_dmg_bonus;
-
-    const def_reduction = total.get("DefReduction") || 0;
-    const def_ignore = total.get("DefIgnore") || 0;
-
-    let resistance_reduction: number;
-    switch (element) {
-      case "Pyro":
-        resistance_reduction = total.get("PyroResistanceReduction");
-        break;
-      case "Hydro":
-        resistance_reduction = total.get("HydroResistanceReduction");
-        break;
-      case "Electro":
-        resistance_reduction = total.get("ElectroResistanceReduction");
-        break;
-      case "Anemo":
-        resistance_reduction = total.get("AnemoResistanceReduction");
-        break;
-      case "Geo":
-        resistance_reduction = total.get("GeoResistanceReduction");
-        break;
-      case "Dendro":
-        resistance_reduction = total.get("DendroResistanceReduction");
-        break;
-      case "Cryo":
-        resistance_reduction = total.get("CryoResistanceReduction");
-        break;
-      case "Physical":
-        resistance_reduction = total.get("PhysicalResistanceReduction");
-        break;
-      default:
-        resistance_reduction = 0.0;
-        break;
-    }
-
-    return default_damage_formula(
-      instances,
-      total_base_scaling_stat,
-      motion_value,
-      1.0,
-      0.0,
-      avg_crit_multiplier(total),
-      total_dmg_bonus,
-      0.0,
-      def_multiplier(90, 100, def_reduction, def_ignore),
-      res_multiplier(0.1, resistance_reduction),
-      amp_multiplier,
-    );
+/** Every factor of a direct hit, suitable for numerical regression assertions. */
+export function characterDamageBreakdown(options: CharacterDamageOptions,
+  character: StatTable): CharacterDamageBreakdown {
+  const instances = options.instances ?? 1;
+  validateInstances(instances);
+  const motionValue = options.motionValue ?? 0;
+  for (const value of [motionValue, options.additiveDamage ?? 0, options.baseDamageMultiplier ?? 1])
+    if (!Number.isFinite(value)) throw new Error("Base damage inputs must be finite");
+  const stats = withBuffs(character, options.buffs);
+  const scaling = scalingValue(stats, options.scaling ?? "ATK", options);
+  const baseDamage = motionValue * scaling * (options.baseDamageMultiplier ?? 1)
+    + (options.additiveDamage ?? 0);
+  const critMultiplier = critFactor(stats, options);
+  const damageMultiplier = 1 + damageBonus(stats, options.element, options.damageType, options.damageBonus)
+    - (options.damageReduction ?? 0);
+  const resistanceMultiplier = resistanceFactor(stats, options.element, options);
+  const defenseMultiplier = defenseFactor(stats, options);
+  return {
+    scalingValue: scaling, baseDamage, critMultiplier, damageMultiplier,
+    resistanceMultiplier, defenseMultiplier, instances,
+    total: baseDamage * critMultiplier * damageMultiplier * resistanceMultiplier
+      * defenseMultiplier * instances,
   };
+}
 
-export {
-  default_damage_formula,
-  avg_crit_multiplier,
-  def_multiplier,
-  res_multiplier,
-  amplifier_multiplier,
-  calculate_damage,
-  total_attack,
-  total_defense,
-  total_health,
-  dmg_formula,
-};
+/** A direct hit; omitted motionValue permits pure additive damage. */
+export function character_damage(options: CharacterDamageOptions): DamageCompute {
+  return (stats) => characterDamageBreakdown(options, stats).total;
+}
+
+export { avg_crit_multiplier, def_multiplier, res_multiplier, amplifier_multiplier } from "./multipliers.js";
+export const total_attack = (stats: StatTable): number => scalingValue(stats, "ATK");
+export const total_defense = (stats: StatTable): number => scalingValue(stats, "DEF");
+export const total_health = (stats: StatTable): number => scalingValue(stats, "HP");
+
+export function transformativeBaseDamage(level: number): number {
+  if (!Number.isInteger(level) || level < 1 || level > 100)
+    throw new Error("character level must be an integer from 1 to 100");
+  return REACTION_LEVEL_MULTIPLIERS[level - 1];
+}
+
+interface ReactionScaling {
+  characterLevel?: number;
+  elementalMasteryBonus?: number;
+  reactionBonus?: number;
+}
+
+/** Raw additive base damage: feed this into a hit, or compose with Swirl. */
+export function additiveReactionBase(kind: "Aggravate" | "Spread", stats: StatTable,
+  options: ReactionScaling = {}): number {
+  const em = stats.get("ElementalMastery") + (options.elementalMasteryBonus ?? 0);
+  return (kind === "Aggravate" ? 1.15 : 1.25)
+    * transformativeBaseDamage(options.characterLevel ?? 90)
+    * (1 + 5 * em / (em + 1200) + stats.get("ReactionBonus") + (options.reactionBonus ?? 0));
+}
+
+// KQM TCL transformative reactions, verified 2026-09-27. EC is per tick.
+const transformativeFactor = {
+  Burning: 0.25, Superconduct: 1.5, Swirl: 0.6, "Electro-Charged": 2,
+  Shattered: 3, Overloaded: 2.75, Bloom: 2, Burgeon: 3, Hyperbloom: 3,
+} as const;
+export type TransformativeReaction = keyof typeof transformativeFactor;
+
+export interface TransformativeOptions extends Pick<DamageContext, "enemyResistance">, ReactionScaling {
+  kind: TransformativeReaction;
+  element: Element;
+  resistanceReduction?: number;
+  instances?: number;
+  buffs?: StatTable;
+}
+
+/** Transformative damage ignores ordinary damage bonus, crit, and defense. */
+export function reaction_damage(options: TransformativeOptions): DamageCompute {
+  if (!Object.prototype.hasOwnProperty.call(transformativeFactor, options.kind))
+    throw new Error(`Unknown transformative reaction: ${options.kind}`);
+  validateInstances(options.instances ?? 1);
+  const levelBase = transformativeBaseDamage(options.characterLevel ?? 90);
+  return (character) => {
+    const stats = withBuffs(character, options.buffs);
+    const em = stats.get("ElementalMastery") + (options.elementalMasteryBonus ?? 0);
+    return transformativeFactor[options.kind] * levelBase
+      * (1 + 16 * em / (em + 2000) + stats.get("ReactionBonus") + (options.reactionBonus ?? 0))
+      * resistanceFactor(stats, options.element, options) * (options.instances ?? 1);
+  };
+}
+
+/** Wrap any calculated damage; only the amplified fraction receives this multiplier. */
+export function amplify(baseDamage: DamageCompute, factor: 1.5 | 2,
+  options: { uptime?: number; elementalMasteryBonus?: number; reactionBonus?: number } = {}): DamageCompute {
+  const uptime = options.uptime ?? 1;
+  if (!Number.isFinite(uptime) || uptime < 0 || uptime > 1)
+    throw new Error("uptime must be finite and between 0 and 1");
+  return (stats) => baseDamage(stats) * (1 - uptime + uptime * amplifier_multiplier(factor,
+    stats.get("ElementalMastery") + (options.elementalMasteryBonus ?? 0),
+    stats.get("ReactionBonus") + (options.reactionBonus ?? 0)));
+}

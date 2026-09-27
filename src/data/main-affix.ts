@@ -1,12 +1,14 @@
 /**
  * Frozen wiki snapshot: Main Affix Distributions
+ * Four-star values cross-checked with Genshin Optimizer artifact_main.json, 2026-09-27
+ * https://raw.githubusercontent.com/frzyc/genshin-optimizer/master/libs/gi/stats/Data/Artifacts/artifact_main.json
  * Source: Genshin Impact Wiki - Artifacts/Scaling
  * Snapshot date: February 15, 2026
  */
 
 export type Slot = "flower" | "feather" | "sands" | "goblet" | "circlet";
 
-export type StatType = (typeof import("@/core/stat").STAT_TYPES)[number];
+export type StatType = (typeof import("../core/stat.js").STAT_TYPES)[number];
 
 export interface MainAffixWeight {
   stat: StatType;
@@ -207,66 +209,6 @@ export const MAIN_STAT_VALUES: MainStatValueTable = {
       HealingBonus: 0.048,
     },
     4: {
-      FlatHP: 828,
-      FlatATK: 54,
-      HPPercent: 0.081,
-      ATKPercent: 0.081,
-      DEFPercent: 0.101,
-      ElementalMastery: 32.3,
-      EnergyRecharge: 0.09,
-      PyroDMGBonus: 0.081,
-      ElectroDMGBonus: 0.081,
-      CryoDMGBonus: 0.081,
-      HydroDMGBonus: 0.081,
-      DendroDMGBonus: 0.081,
-      AnemoDMGBonus: 0.081,
-      GeoDMGBonus: 0.081,
-      PhysicalDMGBonus: 0.101,
-      CritRate: 0.054,
-      CritDMG: 0.108,
-      HealingBonus: 0.062,
-    },
-    8: {
-      FlatHP: 1011,
-      FlatATK: 66,
-      HPPercent: 0.099,
-      ATKPercent: 0.099,
-      DEFPercent: 0.123,
-      ElementalMastery: 39.4,
-      EnergyRecharge: 0.11,
-      PyroDMGBonus: 0.099,
-      ElectroDMGBonus: 0.099,
-      CryoDMGBonus: 0.099,
-      HydroDMGBonus: 0.099,
-      DendroDMGBonus: 0.099,
-      AnemoDMGBonus: 0.099,
-      GeoDMGBonus: 0.099,
-      PhysicalDMGBonus: 0.123,
-      CritRate: 0.066,
-      CritDMG: 0.131,
-      HealingBonus: 0.076,
-    },
-    12: {
-      FlatHP: 1194,
-      FlatATK: 78,
-      HPPercent: 0.116,
-      ATKPercent: 0.116,
-      DEFPercent: 0.146,
-      ElementalMastery: 46.6,
-      EnergyRecharge: 0.129,
-      PyroDMGBonus: 0.116,
-      ElectroDMGBonus: 0.116,
-      CryoDMGBonus: 0.116,
-      HydroDMGBonus: 0.116,
-      DendroDMGBonus: 0.116,
-      AnemoDMGBonus: 0.116,
-      GeoDMGBonus: 0.116,
-      PhysicalDMGBonus: 0.146,
-      CritRate: 0.078,
-      CritDMG: 0.155,
-      HealingBonus: 0.09,
-    },
-    16: {
       FlatHP: 1377,
       FlatATK: 90,
       HPPercent: 0.134,
@@ -286,7 +228,47 @@ export const MAIN_STAT_VALUES: MainStatValueTable = {
       CritDMG: 0.179,
       HealingBonus: 0.103,
     },
-    20: {
+    8: {
+      FlatHP: 2108,
+      FlatATK: 137,
+      HPPercent: 0.206,
+      ATKPercent: 0.206,
+      DEFPercent: 0.257,
+      ElementalMastery: 82.2,
+      EnergyRecharge: 0.228,
+      PyroDMGBonus: 0.206,
+      ElectroDMGBonus: 0.206,
+      CryoDMGBonus: 0.206,
+      HydroDMGBonus: 0.206,
+      DendroDMGBonus: 0.206,
+      AnemoDMGBonus: 0.206,
+      GeoDMGBonus: 0.206,
+      PhysicalDMGBonus: 0.257,
+      CritRate: 0.137,
+      CritDMG: 0.274,
+      HealingBonus: 0.158,
+    },
+    12: {
+      FlatHP: 2839,
+      FlatATK: 185,
+      HPPercent: 0.277,
+      ATKPercent: 0.277,
+      DEFPercent: 0.346,
+      ElementalMastery: 110.8,
+      EnergyRecharge: 0.308,
+      PyroDMGBonus: 0.277,
+      ElectroDMGBonus: 0.277,
+      CryoDMGBonus: 0.277,
+      HydroDMGBonus: 0.277,
+      DendroDMGBonus: 0.277,
+      AnemoDMGBonus: 0.277,
+      GeoDMGBonus: 0.277,
+      PhysicalDMGBonus: 0.346,
+      CritRate: 0.185,
+      CritDMG: 0.369,
+      HealingBonus: 0.213,
+    },
+    16: {
       FlatHP: 3571,
       FlatATK: 232,
       HPPercent: 0.348,

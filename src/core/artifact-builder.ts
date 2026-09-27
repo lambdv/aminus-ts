@@ -1,16 +1,16 @@
-import { StatType, StatTable } from "./stat";
-import { ArtifactRollQuality } from "./artifacts";
+import { StatType, StatTable } from "./stat.js";
+import type { ArtifactRollQuality } from "./artifacts.js";
 import {
   POSSIBLE_SUB_STATS,
   Artifact,
-  rollQualityMultiplier,
   maxRollsFor,
   maxRollsForGiven,
   isValidSubstatType,
   validate_artifact_pieces,
   getMainStatValue,
-  getSubStatValue,
-} from "./artifact-constants";
+  getSubStatTierValue,
+  KQMC_SUBSTAT_VALUES,
+} from "./artifact-constants.js";
 
 /**
  * Way to build 1-5 artifact and distrubte substats accordingly
@@ -22,8 +22,10 @@ export class ArtifactBuilder {
   goblet?: Artifact;
   circlet?: Artifact;
   rolls: Map<[StatType, ArtifactRollQuality, number], number> = new Map();
-  constraints: Map<[StatType, number], number> = new Map();
+  constraints: Map<string, number> = new Map();
   rollLimit?: number;
+  private kqmcMode = false;
+  private kqmcScalar = 1;
 
   private findRollKey(
     statType: StatType,
@@ -39,18 +41,11 @@ export class ArtifactBuilder {
   }
 
   private getConstraint(statType: StatType, rarity: number): number {
-    let sum = 0;
-    for (const [[stat, r], count] of this.constraints.entries()) {
-      if (stat === statType && r === rarity) {
-        sum += count;
-      }
-    }
-    return sum;
+    return this.constraints.get(`${statType}:${rarity}`) ?? 0;
   }
 
   private addConstraint(statType: StatType, rarity: number, amount: number): void {
-    const key: [StatType, number] = [statType, rarity];
-    this.constraints.set(key, amount);
+    this.constraints.set(`${statType}:${rarity}`, amount);
   }
   //general constructor to building any set of artifacts
   constructor(
@@ -96,6 +91,7 @@ export class ArtifactBuilder {
     sands?: Artifact,
     goblet?: Artifact,
     circlet?: Artifact,
+    manualCaps: Partial<Record<StatType, number>> = {},
   ): ArtifactBuilder {
     validate_artifact_pieces(flower, feather, sands, goblet, circlet);
     const pieces = [flower, feather, sands, goblet, circlet].filter(
@@ -117,9 +113,9 @@ export class ArtifactBuilder {
       }
     }
 
-    const rarities = new Set(pieces.map((p) => p.rarity));
-    const rollRarity =
-      rarities.size === 1 ? [...rarities][0] : Math.max(...rarities);
+    if (pieces.length !== 5) throw new Error("KQMC requires five artifacts");
+    const fourStarCount = pieces.filter((p) => p.rarity === 4).length;
+    const rollRarity = Math.max(...pieces.map((p) => p.rarity));
 
     const builder = new ArtifactBuilder(
       flower,
@@ -129,25 +125,23 @@ export class ArtifactBuilder {
       circlet,
     );
 
-    // Initialize constraints for KQMC (2 rolls per substat per artifact)
-    for (const stat of POSSIBLE_SUB_STATS) {
-      for (const piece of pieces) {
-        if (piece.main_stat !== stat) {
-          const current = builder.getConstraint(stat, piece.rarity);
-          builder.addConstraint(stat, piece.rarity, current + 2);
-        }
-      }
-    }
+    builder.kqmcMode = true;
+    builder.kqmcScalar = (5 - fourStarCount + fourStarCount * 0.8) / 5;
+    builder.constraints.clear();
+    builder.rollLimit = 40 - 2 * fourStarCount;
 
-    const base = pieces.reduce((sum, p) => sum + maxRollsFor(p), 0);
-    const penalty = pieces.length;
-    builder.rollLimit = base - penalty;
+    // The cap includes two fixed rolls, plus two distributed rolls per eligible piece.
+    for (const stat of POSSIBLE_SUB_STATS) {
+      const eligible = pieces.filter((piece) => piece.main_stat !== stat).length;
+      const cap = Math.min(2 + 2 * eligible, manualCaps[stat] ?? Infinity);
+      if (!Number.isInteger(cap) || cap < 2)
+        throw new Error(`Invalid KQMC cap for ${stat}`);
+      builder.addConstraint(stat, rollRarity, cap);
+    }
 
     // Roll 2 of each substat at AVG quality and rollRarity
     for (const stat of POSSIBLE_SUB_STATS) {
       builder.roll(stat, "AVG", rollRarity, 2);
-      const current = builder.getConstraint(stat, rollRarity);
-      builder.addConstraint(stat, rollRarity, current + 2);
     }
 
     return builder;
@@ -172,7 +166,7 @@ export class ArtifactBuilder {
     gobletMain: StatType,
     circletMain: StatType,
   ): ArtifactBuilder {
-    const builder = ArtifactBuilder.kqmc(
+    return ArtifactBuilder.kqmc(
       { type: "flower", rarity: 4, level: 16, main_stat: "FlatHP" },
       { type: "feather", rarity: 4, level: 16, main_stat: "FlatATK" },
       { type: "sands", rarity: 4, level: 16, main_stat: sandsMain },
@@ -180,12 +174,6 @@ export class ArtifactBuilder {
       { type: "circlet", rarity: 4, level: 16, main_stat: circletMain },
     );
 
-    for (const stat of POSSIBLE_SUB_STATS) {
-      builder.unroll(stat, "AVG", 5, 2);
-      builder.roll(stat, "AVG", 4, 2);
-    }
-
-    return builder;
   }
 
   static kqmAll4StarWith5Star(
@@ -243,7 +231,7 @@ export class ArtifactBuilder {
         break;
     }
 
-    const builder = ArtifactBuilder.kqmc(
+    return ArtifactBuilder.kqmc(
       { type: "flower", rarity: 4, level: 16, main_stat: "FlatHP" },
       { type: "feather", rarity: 4, level: 16, main_stat: "FlatATK" },
       sandsPiece,
@@ -251,12 +239,6 @@ export class ArtifactBuilder {
       circletPiece,
     );
 
-    for (const stat of POSSIBLE_SUB_STATS) {
-      builder.unroll(stat, "AVG", 5, 2);
-      builder.roll(stat, "AVG", 4, 2);
-    }
-
-    return builder;
   }
 
   build(): StatTable {
@@ -277,7 +259,11 @@ export class ArtifactBuilder {
       this.circlet,
     ].filter((p) => p !== undefined) as Artifact[];
     for (const piece of pieces) {
-      const value = getMainStatValue(piece.main_stat);
+      const value = this.kqmcMode && piece.rarity === 4 && piece.level === 16
+        ? getMainStatValue(piece.main_stat) * 0.8
+        : this.kqmcMode
+          ? getMainStatValue(piece.main_stat)
+          : getMainStatValue(piece.main_stat, piece.rarity, piece.level);
       res.add(piece.main_stat, value);
     }
     return res;
@@ -286,8 +272,9 @@ export class ArtifactBuilder {
   subStats(): StatTable {
     const res = new StatTable();
     for (const [[stat, quality, rarity], num] of this.rolls) {
-      const baseValue = getSubStatValue(rarity, stat);
-      const value = baseValue * rollQualityMultiplier(quality) * num;
+      const value = this.kqmcMode
+        ? (KQMC_SUBSTAT_VALUES[stat] ?? 0) * this.kqmcScalar * num
+        : getSubStatTierValue(rarity, stat, quality) * num;
       res.add(stat, value);
     }
     return res;
@@ -301,7 +288,15 @@ export class ArtifactBuilder {
   ): void {
     if (!isValidSubstatType(substatValue))
       throw new Error("Invalid substat type");
-    const current = this.currentRollsForGiven(substatValue, quality, rarity);
+    if (!Number.isInteger(num) || num < 0) throw new Error("Roll count must be a nonnegative integer");
+    if (num === 0) return;
+    if (this.kqmcMode && quality !== "AVG")
+      throw new Error("KQMC uses average roll quality");
+    if (this.currentRolls() + num > this.maxRolls())
+      throw new Error("Exceeds total roll budget");
+    const current = this.kqmcMode
+      ? this.countStatRolls(substatValue)
+      : this.currentRollsForGiven(substatValue, quality, rarity);
     if (current + num > this.substatConstraint(substatValue, rarity))
       throw new Error("Exceeds constraint");
 
@@ -327,6 +322,8 @@ export class ArtifactBuilder {
     if (!key) return;
 
     const current = this.rolls.get(key) || 0;
+    if (this.kqmcMode && this.countStatRolls(substatValue) - num < 2)
+      throw new Error("Cannot remove KQMC fixed rolls");
     if (current >= num) {
       const newValue = current - num;
       if (newValue === 0) {
@@ -351,6 +348,13 @@ export class ArtifactBuilder {
     return this.rolls.get(key) || 0;
   }
 
+  private countStatRolls(statType: StatType): number {
+    let count = 0;
+    for (const [[stat], rolls] of this.rolls)
+      if (stat === statType) count += rolls;
+    return count;
+  }
+
   maxRolls(): number {
     if (this.rollLimit !== undefined) return this.rollLimit;
 
@@ -365,7 +369,13 @@ export class ArtifactBuilder {
   }
 
   substatConstraint(statType: StatType, rarity: number): number {
+    if (this.kqmcMode) return this.getConstraint(statType, Math.max(...this.pieces().map((p) => p.rarity)));
     return this.getConstraint(statType, rarity);
+  }
+
+  private pieces(): Artifact[] {
+    return [this.flower, this.feather, this.sands, this.goblet, this.circlet]
+      .filter((piece): piece is Artifact => piece !== undefined);
   }
 
   rollsLeft(): number {
@@ -379,9 +389,9 @@ export class ArtifactBuilder {
   ): number {
     return (
       this.substatConstraint(statType, rarity) -
-      this.currentRollsForGiven(statType, quality, rarity)
+      (this.kqmcMode ? this.countStatRolls(statType) : this.currentRollsForGiven(statType, quality, rarity))
     );
   }
 }
 
-export type { Artifact } from "./artifact-constants";
+export type { Artifact } from "./artifact-constants.js";

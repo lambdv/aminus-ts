@@ -4,7 +4,7 @@
  * Snapshot date: February 15, 2026
  */
 
-export type StatType = (typeof import("@/core/stat").STAT_TYPES)[number];
+export type StatType = (typeof import("../core/stat.js").STAT_TYPES)[number];
 
 export interface SubstatWeight {
   stat: StatType;

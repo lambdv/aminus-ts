@@ -1,10 +1,24 @@
 {
   "name": "aminus",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./team": {
+      "types": "./dist/team.d.ts",
+      "import": "./dist/team.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/clean.mjs && tsc",
     "test": "jest"
   },
   "author": "",

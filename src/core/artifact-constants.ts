@@ -1,7 +1,7 @@
-import { StatType, StatTable } from "./stat";
-import { ArtifactRollQuality } from "./artifacts";
-import { MAIN_STAT_VALUES } from "../data/main-affix";
-import { SUBSTAT_ROLL_TIERS } from "../data/substats";
+import { StatType, StatTable } from "./stat.js";
+import type { ArtifactRollQuality } from "./artifacts.js";
+import { MAIN_STAT_VALUES } from "../data/main-affix.js";
+import { SUBSTAT_ROLL_TIERS } from "../data/substats.js";
 
 export type ArtifactType =
   | "flower"
@@ -65,6 +65,20 @@ export const POSSIBLE_SUB_STATS: StatType[] = [
   "EnergyRecharge",
 ];
 
+// DamageTemplate's KQMS scalars (the already averaged value of a 5-star roll).
+export const KQMC_SUBSTAT_VALUES: Partial<Record<StatType, number>> = {
+  HPPercent: 0.0496,
+  FlatHP: 253.94,
+  ATKPercent: 0.0496,
+  FlatATK: 16.54,
+  DEFPercent: 0.062,
+  FlatDEF: 19.68,
+  ElementalMastery: 19.82,
+  EnergyRecharge: 0.0551,
+  CritRate: 0.0331,
+  CritDMG: 0.0662,
+};
+
 // ArtifactPiece is now unified with Artifact
 
 /** returns multiplier for a given roll quality */
@@ -127,12 +141,24 @@ export const validate_artifact_pieces = (
 };
 
 // Function to get main stat value for 5-star level 20 artifacts
-export function getMainStatValue(stat: StatType): number {
-  const rarityTable = MAIN_STAT_VALUES[5];
+export function getMainStatValue(stat: StatType, rarity = 5, level = 20): number {
+  const rarityTable = MAIN_STAT_VALUES[rarity];
   if (!rarityTable) return 0;
-  const levelTable = rarityTable[20];
+  const levelTable = rarityTable[level];
   if (!levelTable) return 0;
   return levelTable[stat] || 0;
+}
+
+export function getSubStatTierValue(
+  rarity: number,
+  stat: StatType,
+  quality: ArtifactRollQuality,
+): number {
+  const tiers = SUBSTAT_ROLL_TIERS[rarity]?.[stat];
+  if (!tiers) return 0;
+  if (quality === "AVG") return getSubStatValue(rarity, stat);
+  const index = { MAX: 0, HIGH: 1, MID: 2, LOW: 3 }[quality];
+  return tiers[index];
 }
 
 export function getSubStatValue(rarity: number, stat: StatType): number {

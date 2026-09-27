@@ -1,6 +1,6 @@
 import { StatTable, Rotation } from "@/core/stat";
-import { dmg_formula } from "@/core/formulas";
-import { optimalKqmc5ArtifactsStats } from "@/core/optimizer";
+import { character_damage } from "@/core/formulas";
+import { optimizeKqmcArtifacts } from "@/core/optimizer";
 
 describe("Damage Calculation Integration", () => {
   it("should calculate primitive character damage", () => {
@@ -18,15 +18,15 @@ describe("Damage Calculation Integration", () => {
       ["CryoResistanceReduction", 0.4],
     );
 
-    const rotation = new Rotation(
-      ["n1", dmg_formula("Cryo", "Normal", 0.84, 3)],
-      ["n2", dmg_formula("Cryo", "Normal", 0.894, 2)],
-      ["ca", dmg_formula("Cryo", "Charged", 3.039, 2)],
-      ["skill", dmg_formula("Cryo", "Skill", 4.07, 2)],
-      ["burstcuts", dmg_formula("Cryo", "Burst", 1.91, 19)],
-      ["burstexplosion", dmg_formula("Cryo", "Burst", 2.86)],
-    );
-    ayaka = ayaka.merge(optimalKqmc5ArtifactsStats(ayaka, rotation, 1.30));
+    const rotation = new Rotation([
+      ["n1", character_damage({ element: "Cryo", damageType: "Normal", motionValue: 0.84, instances: 3 })],
+      ["n2", character_damage({ element: "Cryo", damageType: "Normal", motionValue: 0.894, instances: 2 })],
+      ["ca", character_damage({ element: "Cryo", damageType: "Charged", motionValue: 3.039, instances: 2 })],
+      ["skill", character_damage({ element: "Cryo", damageType: "Skill", motionValue: 4.07, instances: 2 })],
+      ["burstcuts", character_damage({ element: "Cryo", damageType: "Burst", motionValue: 1.91, instances: 19 })],
+      ["burstexplosion", character_damage({ element: "Cryo", damageType: "Burst", motionValue: 2.86 })],
+    ]);
+    ayaka = optimizeKqmcArtifacts({ stats: ayaka, score: s => rotation.execute(s), energyRechargeRequirement: 1.30 }).totalStats;
     const dps = rotation.execute(ayaka) / 21.0;
 
     expect(dps).toBeGreaterThan(0);

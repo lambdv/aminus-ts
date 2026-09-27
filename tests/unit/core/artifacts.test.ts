@@ -69,3 +69,12 @@ describe("ArtifactBuilder", () => {
     expect(bob.mainStats()).toEqual(expected);
   });
 });
+
+// Ordinary artifacts use the actual table, not KQMC's 80% approximation.
+it("keeps actual four-star main stats separate from KQMC", () => {
+  const builder = new ArtifactBuilder(undefined, undefined,
+    { type: "sands", rarity: 4, level: 16, main_stat: "ATKPercent" });
+  expect(builder.mainStats().get("ATKPercent")).toBe(.348);
+  expect(ArtifactBuilder.kqmAll4Star("ATKPercent", "PyroDMGBonus", "CritRate")
+    .mainStats().get("ATKPercent")).toBeCloseTo(.466 * .8,12);
+});

@@ -1,5 +1,5 @@
 import { StatType, StatTable, Rotation, compose } from "@/core/stat";
-import { dmg_formula } from "@/core/formulas";
+import { character_damage } from "@/core/formulas";
 
 describe("StatTable", () => {
   it("should create a new StatTable", () => {
@@ -61,14 +61,14 @@ describe("Rotation", () => {
   it("can do a real damage calc", () => {
     const x = default_stat_table_factory();
     const r = new Rotation([
-      dmg_formula("Cryo", "Normal", 1.0),
-      dmg_formula("Cryo", "Normal", 1.5),
+      ["hit", character_damage({ element: "Cryo", damageType: "Normal", motionValue: 1.0 })],
+      ["hit", character_damage({ element: "Cryo", damageType: "Normal", motionValue: 1.5 })],
     ]);
     const dmg = r.execute(x);
 
     const dmg2 = compose(
-      dmg_formula("Cryo", "Normal", 1.0),
-      dmg_formula("Cryo", "Normal", 1.5),
+      character_damage({ element: "Cryo", damageType: "Normal", motionValue: 1.0 }),
+      character_damage({ element: "Cryo", damageType: "Normal", motionValue: 1.5 }),
     )(x);
 
     expect(dmg).toBeCloseTo(dmg2);
